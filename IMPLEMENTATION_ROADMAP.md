@@ -1,0 +1,19 @@
+# WUE Codex Edition implementation roadmap
+
+Work proceeds in small, tested modules. Each module receives focused service tests, API tests where relevant, a full regression run, and a clean commit before the next module begins.
+
+1. **Backend foundation** — FastAPI application factory, environment settings, PostgreSQL/SQLAlchemy session architecture, health endpoints, pytest setup, and project documentation.
+2. **Projects and furniture** — UUID-backed project and furniture models plus CRUD APIs constrained to chair, dining table, and bookshelf.
+3. **Furniture images** — five named views, JPEG/PNG/WebP validation, upload storage abstraction, and camera-ready frontend contracts.
+4. **Classification** — classifier interface, three-class result model, replaceable AI adapter, and deterministic workflow state handling.
+5. **Overall dimensions** — manual-first dimensions, supported-unit conversion, source tracking, and immutability after any 2D plan exists.
+6. **Parametric 2D plans** — canonical X/Y/Z component geometry, type-specific defaults, draft editing, supported manual components, and revision-ready data design.
+7. **2D finalization** — exact semantic validators for each furniture type and immutable finalized revisions.
+8. **Deterministic 3D** — conversion of finalized components to render geometry, depth/thickness rules, and min-corner-to-center transforms.
+9. **Materials and quantity** — admin-managed materials/prices and calculation-only volume estimates using canonical units and `Decimal`.
+10. **Material costing** — latest-price selection and conversions for mm3, cm3, m3, and board feet.
+11. **Hardware estimation and costing** — documented wood-screw connection rules, validated hardware selection, and `Decimal` costs.
+12. **Labor** — separate rate models and transparent, documented WUE v1 hour-estimation rules.
+13. **Quotation and admin APIs** — combined material, hardware, and labor totals without overhead; management kept separate from calculators.
+14. **Frontend workflow** — React/TypeScript feature modules for projects, images, dimensions, editable 2D, Three.js/R3F viewing, estimates, and quotations.
+15. **End-to-end hardening** — real PostgreSQL integration coverage, frontend/backend contract tests, accessibility, error-state polish, and complete regression verification.

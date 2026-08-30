@@ -1,0 +1,7 @@
+fastapi>=0.115,<0.141
+pydantic>=2.10,<3
+pydantic-settings>=2.7,<3
+psycopg2-binary>=2.9.10,<3
+SQLAlchemy>=2.0.36,<3
+starlette>=0.46,<1
+uvicorn[standard]>=0.30,<1

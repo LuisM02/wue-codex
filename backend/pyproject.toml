@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers"
+testpaths = ["tests"]
+markers = [
+    "integration: tests requiring a real PostgreSQL test database",
+]
