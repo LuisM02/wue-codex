@@ -2,7 +2,7 @@
 
 WUE (Wood U Estimate) is an AI-assisted system for reconstructing wooden furniture, estimating materials and labor, and producing quotations. This repository is a new, independent implementation and supports exactly three furniture types: `chair`, `dining_table`, and `bookshelf`.
 
-Modules 1 through 7 establish the backend foundation, persisted domain resources, five-view image workflow, replaceable classification boundary, canonical overall dimensions, editable parametric 2D plans, and validated immutable design revisions. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, classification orchestration, Decimal unit conversion, deterministic default geometry, and health endpoints.
+Modules 1 through 8 establish the backend foundation, persisted domain resources, five-view image workflow, replaceable classification boundary, canonical overall dimensions, editable parametric 2D plans, validated immutable design revisions, and deterministic renderer-ready 3D geometry. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, classification orchestration, Decimal unit conversion, deterministic geometry services, and health endpoints.
 
 ## Repository layout
 
@@ -95,10 +95,13 @@ Parametric 2D plan endpoints are:
 - `DELETE /api/v1/plans/{plan_id}/components/{component_id}` — remove a draft component
 - `POST /api/v1/plans/{plan_id}/finalize` — semantically validate and permanently finalize a draft
 - `POST /api/v1/plans/{plan_id}/revisions` — deep-copy a finalized plan into the next editable revision
+- `GET /api/v1/plans/{plan_id}/geometry-3d` — derive renderer-ready boxes from finalized geometry without persisting duplicates
 
 Generation creates the exact chair, dining-table, or bookshelf defaults documented by the WUE scope and locks overall dimensions in the same database transaction. Each overall axis must be at least 1 mm so proportional defaults remain representable at the stored precision; a failed generation leaves dimensions unlocked. A plan snapshots its furniture type, receives a positive revision number, and permits only one active draft for each furniture item. Component geometry is stored as `Decimal` millimeters. X/Y/Z are min-corner positions, rotation is expressed in degrees, quantity defaults to one, and sort order controls deterministic presentation. Draft components may temporarily omit depth and thickness; the later 3D stage will fail clearly if neither can supply extrusion depth.
 
 Finalization enforces the approved semantics exactly: chairs require at least one leg plus exactly one seat panel and backrest panel; dining tables require at least one leg plus exactly one tabletop panel; bookshelves require one each of the five carcass panels and at least one uniquely named shelf matching `^shelf_[1-9]\d*$`. Unrecognized components prevent finalization. A finalized plan cannot be edited or directly unfinalized. Creating a revision deep-copies every geometry field into a new draft with new component identities, leaving the source unchanged. Initial-plan generation cannot be used to bypass this copy workflow after plan history exists.
+
+3D reconstruction is calculation-only and accepts finalized plans exclusively. Each component becomes one box descriptor in millimeters: width remains X, height remains Y, and Z depth comes from component `depth` when present or `thickness` otherwise. Missing both fields produces a clear workflow error rather than fabricated geometry. Source X/Y/Z are retained as the minimum corner, while renderer center coordinates are calculated exactly as `(x + width/2, y + height/2, z + resolved_depth/2)` using `Decimal`. The response also identifies the chosen depth source and preserves scalar rotation, quantity, and sort order. Rotation is passed through in degrees; center calculation occurs before any renderer rotation. Quantity remains metadata because WUE has no rule for inventing offsets for repeated pieces.
 
 ## Tests
 

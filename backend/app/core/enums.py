@@ -56,3 +56,10 @@ class ComponentType(str, Enum):
 
     PANEL = "panel"
     LEG = "leg"
+
+
+class ComponentDepthSource(str, Enum):
+    """Which finalized field supplied a reconstructed component's Z extent."""
+
+    COMPONENT_DEPTH = "component_depth"
+    THICKNESS = "thickness"
