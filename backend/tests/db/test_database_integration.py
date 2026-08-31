@@ -1,45 +1,44 @@
-"""Real PostgreSQL integration coverage for the database health endpoint."""
+"""Real PostgreSQL integration coverage for foundation behavior."""
 
-import os
-from collections.abc import Generator
+from pathlib import Path
 
 import pytest
+from alembic.autogenerate import compare_metadata
+from alembic.migration import MigrationContext
+from alembic.script import ScriptDirectory
+from alembic.config import Config
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy import Engine
 
-from app.core.config import Settings
-from app.db.session import get_db_session
-from app.main import app
+from app.db.base import Base
 
 pytestmark = pytest.mark.integration
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 
-@pytest.fixture
-def postgres_session() -> Generator[Session, None, None]:
-    database_url = os.getenv("WUE_TEST_DATABASE_URL")
-    if not database_url:
-        pytest.skip("WUE_TEST_DATABASE_URL is not configured")
-
-    validated_url = Settings(_env_file=None, database_url=database_url).database_url
-    integration_engine = create_engine(validated_url, pool_pre_ping=True)
-    integration_session_factory = sessionmaker(bind=integration_engine, class_=Session)
-
-    try:
-        with integration_session_factory() as session:
-            yield session
-    finally:
-        integration_engine.dispose()
-
-
-def test_database_health_against_postgresql(postgres_session: Session) -> None:
-    app.dependency_overrides[get_db_session] = lambda: postgres_session
-
-    try:
-        with TestClient(app) as client:
-            response = client.get("/api/v1/health/database")
-    finally:
-        app.dependency_overrides.clear()
+def test_database_health_against_postgresql(db_client: TestClient) -> None:
+    response = db_client.get("/api/v1/health/database")
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "database": "reachable"}
+
+
+def test_database_is_at_migration_head(postgres_engine: Engine) -> None:
+    alembic_config = Config(str(BACKEND_ROOT / "alembic.ini"))
+    expected_head = ScriptDirectory.from_config(alembic_config).get_current_head()
+
+    with postgres_engine.connect() as connection:
+        current_revision = MigrationContext.configure(connection).get_current_revision()
+
+    assert current_revision == expected_head
+
+
+def test_migration_matches_orm_metadata(postgres_engine: Engine) -> None:
+    with postgres_engine.connect() as connection:
+        migration_context = MigrationContext.configure(
+            connection,
+            opts={"compare_type": True},
+        )
+        differences = compare_metadata(migration_context, Base.metadata)
+
+    assert differences == []

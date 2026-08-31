@@ -2,7 +2,7 @@
 
 WUE (Wood U Estimate) is an AI-assisted system for reconstructing wooden furniture, estimating materials and labor, and producing quotations. This repository is a new, independent implementation and supports exactly three furniture types: `chair`, `dining_table`, and `bookshelf`.
 
-Module 1 establishes the backend foundation. It includes a FastAPI application, typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, service and database health endpoints, and an initial pytest suite.
+Modules 1 and 2 establish the backend foundation and the first persisted domain resources. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, health endpoints, and project/furniture CRUD.
 
 ## Repository layout
 
@@ -32,6 +32,12 @@ Copy-Item .env.example .env
 
 Edit `.env` with the PostgreSQL credentials for your machine. The application never creates or drops databases.
 
+Apply deliberate schema migrations from `backend`:
+
+```powershell
+alembic upgrade head
+```
+
 Run the API:
 
 ```powershell
@@ -45,6 +51,15 @@ The initial endpoints are:
 - `GET /api/v1/health/database` — executes `SELECT 1` and returns HTTP 503 with a plain-string detail when PostgreSQL is unavailable.
 - `GET /docs` — interactive OpenAPI documentation.
 
+Project and furniture endpoints are:
+
+- `POST/GET /api/v1/projects`
+- `GET/PATCH/DELETE /api/v1/projects/{project_id}`
+- `POST/GET /api/v1/projects/{project_id}/furniture`
+- `GET/PATCH/DELETE /api/v1/furniture/{furniture_id}`
+
+Deleting a project cascades to its furniture. Furniture types are restricted in both API validation and PostgreSQL to `chair`, `dining_table`, and `bookshelf`.
+
 ## Tests
 
 Run the fast suite from `backend`:
@@ -53,14 +68,14 @@ Run the fast suite from `backend`:
 pytest -m "not integration"
 ```
 
-Database/API integration tests use a real PostgreSQL database and are skipped unless `WUE_TEST_DATABASE_URL` is set. After creating a dedicated test database, run the complete suite:
+Database/API integration tests run Alembic against a real PostgreSQL database and are skipped unless `WUE_TEST_DATABASE_URL` is set. Each test uses an outer rollback transaction, so test records do not persist. After creating a dedicated test database, run the complete suite:
 
 ```powershell
 $env:WUE_TEST_DATABASE_URL = "postgresql+psycopg2://postgres:postgres@localhost:5432/wue_codex_test_db"
 pytest
 ```
 
-The integration test is read-only and only executes `SELECT 1`.
+The test database must be dedicated to WUE tests. Migration state and ORM metadata are checked for drift on every complete run.
 
 ## Geometry and costing guardrails
 
