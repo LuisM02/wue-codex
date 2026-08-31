@@ -26,3 +26,19 @@ class ImageInputSource(str, Enum):
 
     UPLOAD = "upload"
     CAMERA_CAPTURE = "camera_capture"
+
+
+class DimensionUnit(str, Enum):
+    """Units accepted at the overall-dimensions API boundary."""
+
+    MILLIMETER = "mm"
+    CENTIMETER = "cm"
+    METER = "m"
+    INCH = "in"
+
+
+class DimensionSource(str, Enum):
+    """Provenance of a furniture dimension set."""
+
+    MANUAL = "manual"
+    AI_ESTIMATE = "ai_estimate"

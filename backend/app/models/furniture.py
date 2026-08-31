@@ -12,6 +12,7 @@ from app.models.mixins import TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.furniture_classification import FurnitureClassification
+    from app.models.furniture_dimensions import FurnitureDimensions
     from app.models.furniture_image import FurnitureImage
     from app.models.project import Project
 
@@ -56,6 +57,12 @@ class Furniture(TimestampMixin, Base):
         passive_deletes=True,
     )
     classification: Mapped["FurnitureClassification | None"] = relationship(
+        back_populates="furniture",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
+    )
+    dimensions: Mapped["FurnitureDimensions | None"] = relationship(
         back_populates="furniture",
         cascade="all, delete-orphan",
         passive_deletes=True,

@@ -2,7 +2,7 @@
 
 WUE (Wood U Estimate) is an AI-assisted system for reconstructing wooden furniture, estimating materials and labor, and producing quotations. This repository is a new, independent implementation and supports exactly three furniture types: `chair`, `dining_table`, and `bookshelf`.
 
-Modules 1 through 4 establish the backend foundation, persisted domain resources, five-view image workflow, and replaceable classification boundary. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, classification orchestration, and health endpoints.
+Modules 1 through 5 establish the backend foundation, persisted domain resources, five-view image workflow, replaceable classification boundary, and canonical overall dimensions. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, classification orchestration, Decimal unit conversion, and health endpoints.
 
 ## Repository layout
 
@@ -76,6 +76,14 @@ Classification endpoints are:
 - `GET /api/v1/furniture/{furniture_id}/classification` — retrieve the latest result
 
 Classification requires all five views and verifies each stored object's SHA-256 integrity before invoking an adapter. The adapter can return only chair, dining table, or bookshelf. A successful prediction updates the furniture type; deleting a source image or manually changing that type invalidates the stored result. The default adapter deliberately returns HTTP 503 because no real AI model is configured yet—it never fabricates a label from filenames or unrelated business state.
+
+Overall dimension endpoints are:
+
+- `PUT /api/v1/furniture/{furniture_id}/dimensions` — create or replace the complete width, height, and depth set while unlocked
+- `GET /api/v1/furniture/{furniture_id}/dimensions` — retrieve canonical millimeter values and provenance
+- `DELETE /api/v1/furniture/{furniture_id}/dimensions` — remove an unlocked set
+
+Dimension input accepts `mm`, `cm`, `m`, and `in`; conversion uses backend `Decimal` values and stores width=X, height=Y, and depth=Z in millimeters. Manual input is the default trusted source and cannot be overwritten by an AI estimate. The dimensions service exposes a non-HTTP lock operation for Module 6 to call in the same transaction as the first 2D-plan creation. There is no unlock operation.
 
 ## Tests
 

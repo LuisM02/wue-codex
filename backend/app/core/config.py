@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "WUE API"
-    app_version: str = "0.4.0"
+    app_version: str = "0.5.0"
     environment: Literal["development", "test", "production"] = "development"
     api_v1_prefix: str = "/api/v1"
     database_url: str = (
