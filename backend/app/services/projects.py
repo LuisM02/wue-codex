@@ -7,7 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.models.project import Project
 from app.schemas.project import ProjectCreate, ProjectUpdate
+from app.services import furniture_images as image_service
 from app.services._persistence import commit, commit_and_refresh
+from app.services.image_storage import ImageStorage
 
 
 def create_project(session: Session, payload: ProjectCreate) -> Project:
@@ -42,6 +44,12 @@ def update_project(
     return project
 
 
-def delete_project(session: Session, project: Project) -> None:
+def delete_project(
+    session: Session,
+    project: Project,
+    storage: ImageStorage,
+) -> None:
+    storage_keys = image_service.storage_keys_for_project(session, project.id)
     session.delete(project)
     commit(session)
+    image_service.delete_storage_objects(storage, storage_keys)

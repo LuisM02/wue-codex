@@ -11,6 +11,7 @@ from app.db.base import Base
 from app.models.mixins import TimestampMixin
 
 if TYPE_CHECKING:
+    from app.models.furniture_image import FurnitureImage
     from app.models.project import Project
 
 
@@ -48,3 +49,8 @@ class Furniture(TimestampMixin, Base):
     )
 
     project: Mapped["Project"] = relationship(back_populates="furniture_items")
+    images: Mapped[list["FurnitureImage"]] = relationship(
+        back_populates="furniture",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

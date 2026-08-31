@@ -6,10 +6,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
+from app.api.dependencies import get_image_storage
 from app.db.session import get_db_session
 from app.schemas.furniture import FurnitureCreate, FurnitureRead, FurnitureUpdate
 from app.services import furniture as furniture_service
 from app.services import projects as project_service
+from app.services.image_storage import LocalImageStorage
 
 project_furniture_router = APIRouter(
     prefix="/projects/{project_id}/furniture",
@@ -17,6 +19,7 @@ project_furniture_router = APIRouter(
 )
 furniture_router = APIRouter(prefix="/furniture", tags=["furniture"])
 SessionDependency = Annotated[Session, Depends(get_db_session)]
+StorageDependency = Annotated[LocalImageStorage, Depends(get_image_storage)]
 
 
 @project_furniture_router.post(
@@ -74,9 +77,13 @@ def update_furniture(
 
 
 @furniture_router.delete("/{furniture_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_furniture(furniture_id: UUID, session: SessionDependency) -> Response:
+def delete_furniture(
+    furniture_id: UUID,
+    session: SessionDependency,
+    storage: StorageDependency,
+) -> Response:
     furniture = furniture_service.get_furniture(session, furniture_id)
     if furniture is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Furniture not found")
-    furniture_service.delete_furniture(session, furniture)
+    furniture_service.delete_furniture(session, furniture, storage)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

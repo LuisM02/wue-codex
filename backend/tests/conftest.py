@@ -2,18 +2,23 @@
 
 import os
 from collections.abc import Generator
+from io import BytesIO
 from pathlib import Path
+from typing import Callable
 
 import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
+from PIL import Image
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
+from app.api.dependencies import get_image_storage
 from app.db.session import get_db_session
 from app.main import app
+from app.services.image_storage import LocalImageStorage
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 
@@ -64,13 +69,35 @@ def db_session(postgres_engine: Engine) -> Generator[Session, None, None]:
 
 
 @pytest.fixture
-def db_client(db_session: Session) -> Generator[TestClient, None, None]:
+def image_storage(tmp_path: Path) -> LocalImageStorage:
+    return LocalImageStorage(tmp_path / "uploads")
+
+
+@pytest.fixture
+def db_client(
+    db_session: Session,
+    image_storage: LocalImageStorage,
+) -> Generator[TestClient, None, None]:
     def override_db_session() -> Generator[Session, None, None]:
         yield db_session
 
     app.dependency_overrides[get_db_session] = override_db_session
+    app.dependency_overrides[get_image_storage] = lambda: image_storage
     try:
         with TestClient(app) as test_client:
             yield test_client
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def image_bytes_factory() -> Callable[..., bytes]:
+    def make_image_bytes(
+        image_format: str = "PNG",
+        size: tuple[int, int] = (4, 3),
+    ) -> bytes:
+        output = BytesIO()
+        Image.new("RGB", size, color=(120, 80, 40)).save(output, format=image_format)
+        return output.getvalue()
+
+    return make_image_bytes

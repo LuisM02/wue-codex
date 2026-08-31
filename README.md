@@ -2,7 +2,7 @@
 
 WUE (Wood U Estimate) is an AI-assisted system for reconstructing wooden furniture, estimating materials and labor, and producing quotations. This repository is a new, independent implementation and supports exactly three furniture types: `chair`, `dining_table`, and `bookshelf`.
 
-Modules 1 and 2 establish the backend foundation and the first persisted domain resources. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, health endpoints, and project/furniture CRUD.
+Modules 1 through 3 establish the backend foundation, persisted domain resources, and the five-view image workflow. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, and health endpoints.
 
 ## Repository layout
 
@@ -32,6 +32,8 @@ Copy-Item .env.example .env
 
 Edit `.env` with the PostgreSQL credentials for your machine. The application never creates or drops databases.
 
+Image files default to `backend/uploads` when the API is run from `backend`. `WUE_UPLOAD_DIRECTORY`, `WUE_MAX_IMAGE_BYTES`, and `WUE_MAX_IMAGE_PIXELS` can change the storage root and safety limits. Image metadata is stored in PostgreSQL; encoded image bytes are stored behind a replaceable local-storage abstraction.
+
 Apply deliberate schema migrations from `backend`:
 
 ```powershell
@@ -58,7 +60,15 @@ Project and furniture endpoints are:
 - `POST/GET /api/v1/projects/{project_id}/furniture`
 - `GET/PATCH/DELETE /api/v1/furniture/{furniture_id}`
 
-Deleting a project cascades to its furniture. Furniture types are restricted in both API validation and PostgreSQL to `chair`, `dining_table`, and `bookshelf`.
+Five-view image endpoints are:
+
+- `POST /api/v1/furniture/{furniture_id}/images/{view}` — multipart upload with optional `source=upload|camera_capture`
+- `GET /api/v1/furniture/{furniture_id}/images` — metadata in front, back, left, right, top order
+- `GET /api/v1/furniture/{furniture_id}/images/{view}` — metadata for one view
+- `GET /api/v1/furniture/{furniture_id}/images/{view}/content` — validated encoded image bytes
+- `DELETE /api/v1/furniture/{furniture_id}/images/{view}` — remove metadata and stored bytes
+
+Each furniture item accepts at most one image per required view. JPEG, PNG, and WebP are verified from actual bytes rather than trusting filenames or MIME declarations. Deleting a project or furniture item also removes its stored image objects. Furniture types remain restricted in both API validation and PostgreSQL to `chair`, `dining_table`, and `bookshelf`.
 
 ## Tests
 

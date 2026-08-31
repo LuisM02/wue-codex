@@ -1,9 +1,10 @@
 """Typed environment configuration."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
@@ -21,12 +22,15 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "WUE API"
-    app_version: str = "0.2.0"
+    app_version: str = "0.3.0"
     environment: Literal["development", "test", "production"] = "development"
     api_v1_prefix: str = "/api/v1"
     database_url: str = (
         "postgresql+psycopg2://postgres:postgres@localhost:5432/wue_codex_db"
     )
+    upload_directory: Path = Path("uploads")
+    max_image_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
+    max_image_pixels: int = Field(default=40_000_000, gt=0)
 
     @field_validator("api_v1_prefix")
     @classmethod

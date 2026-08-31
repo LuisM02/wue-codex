@@ -8,7 +8,9 @@ from sqlalchemy.orm import Session
 from app.models.furniture import Furniture
 from app.models.project import Project
 from app.schemas.furniture import FurnitureCreate, FurnitureUpdate
+from app.services import furniture_images as image_service
 from app.services._persistence import commit, commit_and_refresh
+from app.services.image_storage import ImageStorage
 
 
 def create_furniture(
@@ -54,6 +56,12 @@ def update_furniture(
     return furniture
 
 
-def delete_furniture(session: Session, furniture: Furniture) -> None:
+def delete_furniture(
+    session: Session,
+    furniture: Furniture,
+    storage: ImageStorage,
+) -> None:
+    storage_keys = image_service.storage_keys_for_furniture(session, furniture.id)
     session.delete(furniture)
     commit(session)
+    image_service.delete_storage_objects(storage, storage_keys)
