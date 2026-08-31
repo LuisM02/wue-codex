@@ -2,7 +2,7 @@
 
 WUE (Wood U Estimate) is an AI-assisted system for reconstructing wooden furniture, estimating materials and labor, and producing quotations. This repository is a new, independent implementation and supports exactly three furniture types: `chair`, `dining_table`, and `bookshelf`.
 
-Modules 1 through 5 establish the backend foundation, persisted domain resources, five-view image workflow, replaceable classification boundary, and canonical overall dimensions. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, classification orchestration, Decimal unit conversion, and health endpoints.
+Modules 1 through 6 establish the backend foundation, persisted domain resources, five-view image workflow, replaceable classification boundary, canonical overall dimensions, and editable parametric 2D plans. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, classification orchestration, Decimal unit conversion, deterministic default geometry, and health endpoints.
 
 ## Repository layout
 
@@ -83,7 +83,18 @@ Overall dimension endpoints are:
 - `GET /api/v1/furniture/{furniture_id}/dimensions` — retrieve canonical millimeter values and provenance
 - `DELETE /api/v1/furniture/{furniture_id}/dimensions` — remove an unlocked set
 
-Dimension input accepts `mm`, `cm`, `m`, and `in`; conversion uses backend `Decimal` values and stores width=X, height=Y, and depth=Z in millimeters. Manual input is the default trusted source and cannot be overwritten by an AI estimate. The dimensions service exposes a non-HTTP lock operation for Module 6 to call in the same transaction as the first 2D-plan creation. There is no unlock operation.
+Dimension input accepts `mm`, `cm`, `m`, and `in`; conversion uses backend `Decimal` values and stores width=X, height=Y, and depth=Z in millimeters. Manual input is the default trusted source and cannot be overwritten by an AI estimate. The first 2D-plan generation calls the dimension lock in the same transaction. There is no unlock operation.
+
+Parametric 2D plan endpoints are:
+
+- `POST /api/v1/furniture/{furniture_id}/plans` — generate the first editable draft from canonical dimensions
+- `GET /api/v1/furniture/{furniture_id}/plans` — list revision-ready plans and their ordered components
+- `GET /api/v1/plans/{plan_id}` — retrieve one plan with its ordered components
+- `POST /api/v1/plans/{plan_id}/components` — add a supported panel or leg to a draft
+- `PATCH /api/v1/plans/{plan_id}/components/{component_id}` — edit draft geometry
+- `DELETE /api/v1/plans/{plan_id}/components/{component_id}` — remove a draft component
+
+Generation creates the exact chair, dining-table, or bookshelf defaults documented by the WUE scope and locks overall dimensions in the same database transaction. Each overall axis must be at least 1 mm so proportional defaults remain representable at the stored precision; a failed generation leaves dimensions unlocked. A plan snapshots its furniture type, receives a positive revision number, and permits only one active draft for each furniture item. Component geometry is stored as `Decimal` millimeters. X/Y/Z are min-corner positions, rotation is expressed in degrees, quantity defaults to one, and sort order controls deterministic presentation. Draft components may temporarily omit depth and thickness; the later 3D stage will fail clearly if neither can supply extrusion depth. Finalization is intentionally reserved for Module 7, while the persistence and service layers already reject component mutations when a plan is finalized.
 
 ## Tests
 
@@ -106,7 +117,7 @@ The test database must be dedicated to WUE tests. Migration state and ORM metada
 
 - Canonical axes are X = left/right, Y = vertical, and Z = front/back; the floor is Y = 0.
 - Overall dimensions use width = X, height = Y, and depth = Z.
-- Finalized 2D geometry will be immutable and will be the source of truth for deterministic 3D and calculations.
+- Finalized 2D geometry is guarded as immutable and will be the source of truth for deterministic 3D and calculations after Module 7 exposes validated finalization.
 - Calculations will use millimeters, cubic millimeters, and backend `Decimal` values.
 - Visual appearance and costing material are separate concepts.
 - Quotations exclude overhead.

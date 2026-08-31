@@ -42,3 +42,17 @@ class DimensionSource(str, Enum):
 
     MANUAL = "manual"
     AI_ESTIMATE = "ai_estimate"
+
+
+class PlanStatus(str, Enum):
+    """Lifecycle states for a versioned parametric plan."""
+
+    DRAFT = "draft"
+    FINALIZED = "finalized"
+
+
+class ComponentType(str, Enum):
+    """Geometry primitives supported by WUE furniture plans."""
+
+    PANEL = "panel"
+    LEG = "leg"

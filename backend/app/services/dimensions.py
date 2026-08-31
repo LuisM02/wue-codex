@@ -80,10 +80,14 @@ def canonicalize(payload: FurnitureDimensionsWrite) -> CanonicalDimensions:
 def get_dimensions(
     session: Session,
     furniture_id: UUID,
+    *,
+    for_update: bool = False,
 ) -> FurnitureDimensions | None:
     statement = select(FurnitureDimensions).where(
         FurnitureDimensions.furniture_id == furniture_id
     )
+    if for_update:
+        statement = statement.with_for_update()
     return session.scalar(statement)
 
 
@@ -134,7 +138,7 @@ def lock_dimensions_for_plan(
     furniture_id: UUID,
 ) -> FurnitureDimensions:
     """Lock dimensions inside the caller's future 2D-plan transaction."""
-    dimensions = get_dimensions(session, furniture_id)
+    dimensions = get_dimensions(session, furniture_id, for_update=True)
     if dimensions is None:
         raise DimensionsRequiredError(
             "Overall dimensions are required before generating a 2D plan"
