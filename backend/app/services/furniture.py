@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.models.furniture import Furniture
 from app.models.project import Project
 from app.schemas.furniture import FurnitureCreate, FurnitureUpdate
+from app.services.classification_state import invalidate_classification
 from app.services import furniture_images as image_service
 from app.services._persistence import commit, commit_and_refresh
 from app.services.image_storage import ImageStorage
@@ -50,7 +51,11 @@ def update_furniture(
     furniture: Furniture,
     payload: FurnitureUpdate,
 ) -> Furniture:
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    requested_type = updates.get("furniture_type")
+    if requested_type is not None and requested_type != furniture.furniture_type:
+        invalidate_classification(session, furniture.id)
+    for field, value in updates.items():
         setattr(furniture, field, value)
     commit_and_refresh(session, furniture)
     return furniture

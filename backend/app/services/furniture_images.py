@@ -11,6 +11,7 @@ from app.core.enums import FurnitureImageView, ImageInputSource
 from app.models.furniture import Furniture
 from app.models.furniture_image import FurnitureImage
 from app.services._persistence import commit
+from app.services.classification_state import invalidate_classification
 from app.services.image_storage import ImageStorage
 from app.services.image_validation import ValidatedImage
 
@@ -91,6 +92,7 @@ def delete_furniture_image(
     image: FurnitureImage,
 ) -> None:
     storage_key = image.storage_key
+    invalidate_classification(session, image.furniture_id)
     session.delete(image)
     commit(session)
     delete_storage_objects(storage, [storage_key])

@@ -2,7 +2,7 @@
 
 WUE (Wood U Estimate) is an AI-assisted system for reconstructing wooden furniture, estimating materials and labor, and producing quotations. This repository is a new, independent implementation and supports exactly three furniture types: `chair`, `dining_table`, and `bookshelf`.
 
-Modules 1 through 3 establish the backend foundation, persisted domain resources, and the five-view image workflow. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, and health endpoints.
+Modules 1 through 4 establish the backend foundation, persisted domain resources, five-view image workflow, and replaceable classification boundary. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, classification orchestration, and health endpoints.
 
 ## Repository layout
 
@@ -69,6 +69,13 @@ Five-view image endpoints are:
 - `DELETE /api/v1/furniture/{furniture_id}/images/{view}` — remove metadata and stored bytes
 
 Each furniture item accepts at most one image per required view. JPEG, PNG, and WebP are verified from actual bytes rather than trusting filenames or MIME declarations. Deleting a project or furniture item also removes its stored image objects. Furniture types remain restricted in both API validation and PostgreSQL to `chair`, `dining_table`, and `bookshelf`.
+
+Classification endpoints are:
+
+- `POST /api/v1/furniture/{furniture_id}/classification` — classify the complete five-view set and persist the latest result
+- `GET /api/v1/furniture/{furniture_id}/classification` — retrieve the latest result
+
+Classification requires all five views and verifies each stored object's SHA-256 integrity before invoking an adapter. The adapter can return only chair, dining table, or bookshelf. A successful prediction updates the furniture type; deleting a source image or manually changing that type invalidates the stored result. The default adapter deliberately returns HTTP 503 because no real AI model is configured yet—it never fabricates a label from filenames or unrelated business state.
 
 ## Tests
 

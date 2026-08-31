@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from app.api.routes.classification import router as classification_router
 from app.api.routes.furniture import furniture_router, project_furniture_router
 from app.api.routes.furniture_images import router as furniture_images_router
 from app.api.routes.health import router as health_router
@@ -12,4 +13,5 @@ api_router.include_router(health_router)
 api_router.include_router(projects_router)
 api_router.include_router(project_furniture_router)
 api_router.include_router(furniture_images_router)
+api_router.include_router(classification_router)
 api_router.include_router(furniture_router)
