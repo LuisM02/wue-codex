@@ -18,6 +18,7 @@ from app.services import dimensions as dimension_service
 from app.services import furniture as furniture_service
 from app.services import plans as plan_service
 from app.services.plan_geometry import PlanGeometryRangeError
+from app.services.plan_validation import PlanSemanticValidationError
 
 furniture_plans_router = APIRouter(
     prefix="/furniture/{furniture_id}/plans",
@@ -52,6 +53,8 @@ def generate_plan(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except plan_service.DraftPlanExistsError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except plan_service.PlanHistoryExistsError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except PlanGeometryRangeError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
@@ -69,6 +72,38 @@ def list_plans(
 @plans_router.get("/{plan_id}", response_model=FurniturePlanRead)
 def get_plan(plan_id: UUID, session: SessionDependency) -> FurniturePlanRead:
     return require_plan(session, plan_id)
+
+
+@plans_router.post("/{plan_id}/finalize", response_model=FurniturePlanRead)
+def finalize_plan(
+    plan_id: UUID,
+    session: SessionDependency,
+) -> FurniturePlanRead:
+    plan = require_plan(session, plan_id)
+    try:
+        return plan_service.finalize_plan(session, plan)
+    except plan_service.PlanNotDraftError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except PlanSemanticValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@plans_router.post(
+    "/{plan_id}/revisions",
+    response_model=FurniturePlanRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_revision(
+    plan_id: UUID,
+    session: SessionDependency,
+) -> FurniturePlanRead:
+    plan = require_plan(session, plan_id)
+    try:
+        return plan_service.create_revision(session, plan)
+    except plan_service.PlanRevisionSourceError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except plan_service.DraftPlanExistsError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 @plans_router.post(

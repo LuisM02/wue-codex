@@ -16,6 +16,7 @@ from app.schemas.plans import ComponentCreate, ComponentUpdate
 from app.services._persistence import commit, commit_and_refresh
 from app.services.dimensions import lock_dimensions_for_plan
 from app.services.plan_geometry import generate_default_components
+from app.services.plan_validation import validate_plan_components
 
 
 class DraftPlanExistsError(RuntimeError):
@@ -24,6 +25,30 @@ class DraftPlanExistsError(RuntimeError):
 
 class PlanNotDraftError(RuntimeError):
     """Raised when a component mutation targets an immutable plan."""
+
+
+class PlanRevisionSourceError(RuntimeError):
+    """Raised when a draft is used as the source of a new revision."""
+
+
+class PlanHistoryExistsError(RuntimeError):
+    """Raised when initial generation is attempted after revision one."""
+
+
+COMPONENT_COPY_FIELDS = (
+    "component_name",
+    "component_type",
+    "width",
+    "height",
+    "depth",
+    "thickness",
+    "x",
+    "y",
+    "z",
+    "rotation",
+    "quantity",
+    "sort_order",
+)
 
 
 def get_plan(session: Session, plan_id: UUID) -> FurniturePlan | None:
@@ -63,6 +88,14 @@ def create_initial_plan(session: Session, furniture: Furniture) -> FurniturePlan
     """Generate a draft and lock overall dimensions in one transaction."""
     if get_draft_plan(session, furniture.id) is not None:
         raise DraftPlanExistsError("Furniture already has an editable draft plan")
+    if session.scalar(
+        select(FurniturePlan.id).where(
+            FurniturePlan.furniture_id == furniture.id
+        ).limit(1)
+    ) is not None:
+        raise PlanHistoryExistsError(
+            "Furniture already has a plan; create a revision from a finalized plan"
+        )
 
     try:
         dimensions = lock_dimensions_for_plan(session, furniture.id)
@@ -110,6 +143,76 @@ def create_initial_plan(session: Session, furniture: Furniture) -> FurniturePlan
     created = get_plan(session, plan.id)
     if created is None:  # pragma: no cover - database invariant defense
         raise RuntimeError("Created plan could not be reloaded")
+    return created
+
+
+def finalize_plan(session: Session, plan: FurniturePlan) -> FurniturePlan:
+    """Validate and permanently transition a draft to finalized."""
+    require_draft(plan)
+    validate_plan_components(plan.furniture_type, plan.components)
+    plan.status = PlanStatus.FINALIZED
+    _touch(plan)
+    commit(session)
+    finalized = get_plan(session, plan.id)
+    if finalized is None:  # pragma: no cover - database invariant defense
+        raise RuntimeError("Finalized plan could not be reloaded")
+    return finalized
+
+
+def create_revision(session: Session, source: FurniturePlan) -> FurniturePlan:
+    """Copy a finalized design into the next editable revision."""
+    if source.status != PlanStatus.FINALIZED:
+        raise PlanRevisionSourceError(
+            "Only a finalized plan can be used to create a revision"
+        )
+    if get_draft_plan(session, source.furniture_id) is not None:
+        raise DraftPlanExistsError("Furniture already has an editable draft plan")
+
+    try:
+        latest_revision = session.scalar(
+            select(func.max(FurniturePlan.revision)).where(
+                FurniturePlan.furniture_id == source.furniture_id
+            )
+        )
+        revision = 1 if latest_revision is None else latest_revision + 1
+        plan = FurniturePlan(
+            furniture_id=source.furniture_id,
+            revision=revision,
+            status=PlanStatus.DRAFT,
+            furniture_type=source.furniture_type,
+        )
+        session.add(plan)
+        session.flush()
+        session.add_all(
+            FurnitureComponent(
+                plan_id=plan.id,
+                **{
+                    field: getattr(component, field)
+                    for field in COMPONENT_COPY_FIELDS
+                },
+            )
+            for component in source.components
+        )
+        session.commit()
+    except IntegrityError as exc:
+        constraint_name = getattr(getattr(exc, "orig", None), "diag", None)
+        constraint_name = getattr(constraint_name, "constraint_name", None)
+        session.rollback()
+        if constraint_name in {
+            "uq_furniture_plans_one_draft_per_furniture",
+            "uq_furniture_plans_furniture_revision",
+        }:
+            raise DraftPlanExistsError(
+                "Furniture already has an editable draft plan"
+            ) from exc
+        raise
+    except Exception:
+        session.rollback()
+        raise
+
+    created = get_plan(session, plan.id)
+    if created is None:  # pragma: no cover - database invariant defense
+        raise RuntimeError("Created revision could not be reloaded")
     return created
 
 
