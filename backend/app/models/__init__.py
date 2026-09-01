@@ -6,6 +6,8 @@ from app.models.furniture_component import FurnitureComponent
 from app.models.furniture_dimensions import FurnitureDimensions
 from app.models.furniture_image import FurnitureImage
 from app.models.furniture_plan import FurniturePlan
+from app.models.labor_rate import LaborRate
+from app.models.labor_rate_price import LaborRatePrice
 from app.models.material import Material
 from app.models.material_price import MaterialPrice
 from app.models.project import Project
@@ -17,6 +19,8 @@ __all__ = [
     "FurnitureDimensions",
     "FurnitureImage",
     "FurniturePlan",
+    "LaborRate",
+    "LaborRatePrice",
     "Material",
     "MaterialPrice",
     "Project",
