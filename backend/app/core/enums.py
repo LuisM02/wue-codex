@@ -89,3 +89,17 @@ class HardwareConnectionType(str, Enum):
     BACKREST = "backrest_connections"
     CARCASS = "carcass_connections"
     SHELF = "shelf_connections"
+
+
+class LaborRuleCode(str, Enum):
+    """Transparent WUE v1 labor-hour rule identifiers."""
+
+    CHAIR_BASE_ASSEMBLY = "chair_base_assembly"
+    CHAIR_LEG_WORK = "chair_leg_work"
+    CHAIR_BACKREST_WORK = "chair_backrest_work"
+    DINING_TABLE_BASE_ASSEMBLY = "dining_table_base_assembly"
+    DINING_TABLE_LEG_WORK = "dining_table_leg_work"
+    DINING_TABLE_TABLETOP_WORK = "dining_table_tabletop_work"
+    BOOKSHELF_BASE_ASSEMBLY = "bookshelf_base_assembly"
+    BOOKSHELF_CARCASS_PANEL_WORK = "bookshelf_carcass_panel_work"
+    BOOKSHELF_SHELF_WORK = "bookshelf_shelf_work"
