@@ -2,21 +2,21 @@
 
 WUE (Wood U Estimate) is an AI-assisted system for reconstructing wooden furniture, estimating materials and labor, and producing quotations. This repository is a new, independent implementation and supports exactly three furniture types: `chair`, `dining_table`, and `bookshelf`.
 
-Modules 1 through 15 establish the backend foundation, persisted domain resources, five-view image workflow, replaceable classification boundary, canonical overall dimensions, editable parametric 2D plans, validated immutable design revisions, deterministic renderer-ready 3D geometry, separate administrative material and labor-rate catalogs, calculation-only cost domains, and immutable quotation snapshots. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, classification orchestration, deterministic calculations, and health endpoints.
+Modules 1 through 16 establish the backend foundation, persisted domain resources, five-view image workflow, replaceable classification boundary, canonical overall dimensions, editable parametric 2D plans, validated immutable design revisions, deterministic renderer-ready 3D geometry, separate administrative material and labor-rate catalogs, calculation-only cost domains, immutable quotation snapshots, and the complete guided web interface. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, classification orchestration, deterministic calculations, and health endpoints. The responsive React interface carries the same source records from project setup through printable quotations without mixing visual appearance and costing choices.
 
 ## Repository layout
 
 ```text
 backend/                    FastAPI backend and tests
+frontend/                   React, TypeScript, Vite, Three.js, and Vitest app
 IMPLEMENTATION_ROADMAP.md   Incremental backend/frontend delivery plan
 ```
-
-The frontend will be introduced in a later module using React, TypeScript, Vite, Three.js, React Three Fiber, Drei, and Vitest.
 
 ## Requirements
 
 - Python 3.12 or newer
 - PostgreSQL
+- Node.js 20.19 or newer
 
 ## Backend setup
 
@@ -156,6 +156,28 @@ pytest
 ```
 
 The test database must be dedicated to WUE tests. Migration state and ORM metadata are checked for drift on every complete run.
+
+## Frontend setup
+
+Install and run the web interface in a second terminal after starting the API:
+
+```powershell
+Set-Location frontend
+npm install
+npm run dev
+```
+
+Open `http://127.0.0.1:5173`. The Vite development server proxies `/api` to the backend at `http://localhost:8000`, so no browser CORS configuration is required. The interface guides users through project and furniture selection, five required views, dimensions, editable plan review and finalization, deterministic 3D inspection, separate appearance selection, exact costing, and immutable quotation snapshots.
+
+Run frontend verification from `frontend`:
+
+```powershell
+npm test
+npm run build
+npm audit --audit-level=moderate
+```
+
+The Three.js viewer is loaded only when the preview step opens, keeping it out of the initial application bundle.
 
 ## Geometry and costing guardrails
 
