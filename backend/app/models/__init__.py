@@ -11,6 +11,7 @@ from app.models.labor_rate_price import LaborRatePrice
 from app.models.material import Material
 from app.models.material_price import MaterialPrice
 from app.models.project import Project
+from app.models.quotation import Quotation
 
 __all__ = [
     "Furniture",
@@ -24,4 +25,5 @@ __all__ = [
     "Material",
     "MaterialPrice",
     "Project",
+    "Quotation",
 ]

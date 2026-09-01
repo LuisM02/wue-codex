@@ -2,7 +2,7 @@
 
 Work proceeds in small, tested modules. Each module receives focused service tests, API tests where relevant, a full regression run, and a clean commit before the next module begins.
 
-Current status: Modules 1 through 14 complete.
+Current status: Modules 1 through 15 complete.
 
 1. **Backend foundation (complete)** — FastAPI application factory, environment settings, PostgreSQL/SQLAlchemy session architecture, health endpoints, pytest setup, and project documentation.
 2. **Projects and furniture (complete)** — UUID-backed project and furniture models plus CRUD APIs constrained to chair, dining table, and bookshelf.
@@ -18,6 +18,6 @@ Current status: Modules 1 through 14 complete.
 12. **Hardware costing (complete)** — validated hardware selection, latest per-piece pricing, and `Decimal` costs.
 13. **Labor quantity estimation (complete)** — calculation-only, transparent WUE v1 hour assumptions derived from finalized component semantics.
 14. **Labor rates and costing (complete)** — separate admin-maintained hourly rates, dated history, and `Decimal` labor costs.
-15. **Quotation and admin APIs** — combined material, hardware, and labor totals without overhead; management kept separate from calculators.
+15. **Quotation and admin APIs (complete)** — exact material, hardware, and labor totals without overhead plus immutable historical snapshots.
 16. **Frontend workflow** — React/TypeScript feature modules for projects, images, dimensions, editable 2D, Three.js/R3F viewing, estimates, and quotations.
 17. **End-to-end hardening** — real PostgreSQL integration coverage, frontend/backend contract tests, accessibility, error-state polish, and complete regression verification.

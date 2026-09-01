@@ -2,7 +2,7 @@
 
 WUE (Wood U Estimate) is an AI-assisted system for reconstructing wooden furniture, estimating materials and labor, and producing quotations. This repository is a new, independent implementation and supports exactly three furniture types: `chair`, `dining_table`, and `bookshelf`.
 
-Modules 1 through 14 establish the backend foundation, persisted domain resources, five-view image workflow, replaceable classification boundary, canonical overall dimensions, editable parametric 2D plans, validated immutable design revisions, deterministic renderer-ready 3D geometry, separate administrative material and labor-rate catalogs, calculation-only material and hardware estimates, transparent rule-based labor hours, and Decimal labor costing. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, classification orchestration, deterministic calculations, and health endpoints.
+Modules 1 through 15 establish the backend foundation, persisted domain resources, five-view image workflow, replaceable classification boundary, canonical overall dimensions, editable parametric 2D plans, validated immutable design revisions, deterministic renderer-ready 3D geometry, separate administrative material and labor-rate catalogs, calculation-only cost domains, and immutable quotation snapshots. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, classification orchestration, deterministic calculations, and health endpoints.
 
 ## Repository layout
 
@@ -102,6 +102,9 @@ Parametric 2D plan endpoints are:
 - `GET /api/v1/plans/{plan_id}/hardware-cost?material_id={material_id}` — price the live wood-screw estimate using an eligible hardware catalog item
 - `GET /api/v1/plans/{plan_id}/labor-quantity` — apply the WUE v1 labor-hour rules to finalized component semantics
 - `GET /api/v1/plans/{plan_id}/labor-cost?labor_rate_id={labor_rate_id}` — price the live labor-hour estimate using an active labor rate
+- `GET /api/v1/plans/{plan_id}/complete-cost?material_id={material_id}&hardware_material_id={hardware_material_id}&labor_rate_id={labor_rate_id}` — combine the three live cost domains
+- `POST/GET /api/v1/plans/{plan_id}/quotations` — create and list immutable quotation snapshots
+- `GET/DELETE /api/v1/quotations/{quotation_id}` — retrieve or remove one quotation snapshot
 
 Generation creates the exact chair, dining-table, or bookshelf defaults documented by the WUE scope and locks overall dimensions in the same database transaction. Each overall axis must be at least 1 mm so proportional defaults remain representable at the stored precision; a failed generation leaves dimensions unlocked. A plan snapshots its furniture type, receives a positive revision number, and permits only one active draft for each furniture item. Component geometry is stored as `Decimal` millimeters. X/Y/Z are min-corner positions, rotation is expressed in degrees, quantity defaults to one, and sort order controls deterministic presentation. Draft components may temporarily omit depth and thickness; the later 3D stage will fail clearly if neither can supply extrusion depth.
 
@@ -134,6 +137,8 @@ Hardware costing derives that screw quantity live and multiplies it by the lates
 Labor-hour estimation is a separate calculation-only domain and does not use materials, prices, 3D geometry, or AI inference. The explicit WUE v1 assumptions are: chair base assembly 1.00 hour, 0.25 hour per leg, and 0.50 hour per backrest; dining-table base assembly 1.50 hours, 0.30 hour per leg, and 0.50 hour per tabletop; bookshelf base assembly 1.50 hours, 0.25 hour per recognized carcass panel, and 0.20 hour per valid shelf. Default totals are 2.50 hours, 3.20 hours, and 3.35 hours respectively. These are thesis estimation assumptions rather than universal industry standards.
 
 Labor rates remain completely separate from materials. Each named rate has an active status and dated per-hour price history. Latest selection uses `effective_date DESC, created_at DESC`, deliberately includes future dates, and has no currency field. Labor costing is read-only: it multiplies the live finalized-plan labor hours by the latest selected hourly rate using a fixed high-precision `Decimal` context, preserves the rule breakdown, and applies no hidden rounding.
+
+Complete cost estimation adds exactly wood/material cost, wood-screw hardware cost, and labor cost using `Decimal`. It contains no overhead term. Quotation creation accepts only the three selected catalog identifiers; clients cannot submit or override calculated totals. Each quotation snapshots the finalized plan revision, selected names and price identities, effective dates, quantities, rates, component costs, and exact total. Later catalog price changes affect new quotations but never rewrite existing ones. Quotation snapshots have no currency or overhead field and are immutable through the API.
 
 ## Tests
 

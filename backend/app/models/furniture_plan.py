@@ -22,6 +22,7 @@ from app.models.mixins import TimestampMixin
 if TYPE_CHECKING:
     from app.models.furniture import Furniture
     from app.models.furniture_component import FurnitureComponent
+    from app.models.quotation import Quotation
 
 
 class FurniturePlan(TimestampMixin, Base):
@@ -94,4 +95,10 @@ class FurniturePlan(TimestampMixin, Base):
             "(FurnitureComponent.sort_order, FurnitureComponent.created_at, "
             "FurnitureComponent.id)"
         ),
+    )
+    quotations: Mapped[list["Quotation"]] = relationship(
+        back_populates="plan",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="(Quotation.created_at.desc(), Quotation.id.desc())",
     )
