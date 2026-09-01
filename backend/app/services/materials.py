@@ -157,6 +157,24 @@ def list_prices(
     return list(session.scalars(statement).all())
 
 
+def get_latest_price(
+    session: Session,
+    material_id: UUID,
+) -> MaterialPrice | None:
+    """Select latest by effective date and creation time, without a today filter."""
+    statement = (
+        select(MaterialPrice)
+        .where(MaterialPrice.material_id == material_id)
+        .order_by(
+            MaterialPrice.effective_date.desc(),
+            MaterialPrice.created_at.desc(),
+            MaterialPrice.id.desc(),
+        )
+        .limit(1)
+    )
+    return session.scalar(statement)
+
+
 def get_price(session: Session, price_id: UUID) -> MaterialPrice | None:
     return session.get(MaterialPrice, price_id)
 

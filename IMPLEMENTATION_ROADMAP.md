@@ -2,7 +2,7 @@
 
 Work proceeds in small, tested modules. Each module receives focused service tests, API tests where relevant, a full regression run, and a clean commit before the next module begins.
 
-Current status: Modules 1 through 9 complete.
+Current status: Modules 1 through 10 complete.
 
 1. **Backend foundation (complete)** — FastAPI application factory, environment settings, PostgreSQL/SQLAlchemy session architecture, health endpoints, pytest setup, and project documentation.
 2. **Projects and furniture (complete)** — UUID-backed project and furniture models plus CRUD APIs constrained to chair, dining table, and bookshelf.
@@ -13,7 +13,7 @@ Current status: Modules 1 through 9 complete.
 7. **2D finalization (complete)** — exact semantic validators for each furniture type, immutable finalized plans, and editable successor revisions.
 8. **Deterministic 3D (complete)** — read-only conversion of finalized components to render geometry, exact depth/thickness fallback, and min-corner-to-center transforms.
 9. **Materials and quantity (complete)** — admin-managed materials and dated price history plus calculation-only volume estimates using canonical units and `Decimal`.
-10. **Material costing** — latest-price selection and conversions for mm3, cm3, m3, and board feet.
+10. **Material costing (complete)** — calculation-only latest-price selection and Decimal conversions for mm3, cm3, m3, and board feet.
 11. **Hardware estimation and costing** — documented wood-screw connection rules, validated hardware selection, and `Decimal` costs.
 12. **Labor** — separate rate models and transparent, documented WUE v1 hour-estimation rules.
 13. **Quotation and admin APIs** — combined material, hardware, and labor totals without overhead; management kept separate from calculators.
