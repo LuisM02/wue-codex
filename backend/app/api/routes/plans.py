@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db_session
 from app.models.furniture_plan import FurniturePlan
+from app.schemas.hardware_quantity import HardwareQuantityRead
 from app.schemas.material_quantity import MaterialQuantityRead
 from app.schemas.plans import (
     ComponentCreate,
@@ -18,6 +19,7 @@ from app.schemas.plans import (
 from app.schemas.reconstruction_3d import PlanGeometry3DRead
 from app.services import dimensions as dimension_service
 from app.services import furniture as furniture_service
+from app.services import hardware_quantity as hardware_quantity_service
 from app.services import material_quantity as quantity_service
 from app.services import plans as plan_service
 from app.services import reconstruction_3d as reconstruction_service
@@ -109,6 +111,21 @@ def get_material_quantity(
     except reconstruction_service.PlanNotFinalizedError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except reconstruction_service.ComponentDepthRequiredError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@plans_router.get(
+    "/{plan_id}/hardware-quantity",
+    response_model=HardwareQuantityRead,
+)
+def get_hardware_quantity(
+    plan_id: UUID,
+    session: SessionDependency,
+) -> HardwareQuantityRead:
+    plan = require_plan(session, plan_id)
+    try:
+        return hardware_quantity_service.calculate_hardware_quantity(plan)
+    except hardware_quantity_service.PlanNotFinalizedError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 

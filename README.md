@@ -2,7 +2,7 @@
 
 WUE (Wood U Estimate) is an AI-assisted system for reconstructing wooden furniture, estimating materials and labor, and producing quotations. This repository is a new, independent implementation and supports exactly three furniture types: `chair`, `dining_table`, and `bookshelf`.
 
-Modules 1 through 10 establish the backend foundation, persisted domain resources, five-view image workflow, replaceable classification boundary, canonical overall dimensions, editable parametric 2D plans, validated immutable design revisions, deterministic renderer-ready 3D geometry, an administrative material catalog, and calculation-only material quantity and cost. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, classification orchestration, Decimal unit conversion, deterministic geometry and costing services, and health endpoints.
+Modules 1 through 11 establish the backend foundation, persisted domain resources, five-view image workflow, replaceable classification boundary, canonical overall dimensions, editable parametric 2D plans, validated immutable design revisions, deterministic renderer-ready 3D geometry, an administrative material catalog, calculation-only material quantity and cost, and rule-based hardware quantity estimation. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, classification orchestration, Decimal unit conversion, deterministic geometry and costing services, and health endpoints.
 
 ## Repository layout
 
@@ -98,6 +98,7 @@ Parametric 2D plan endpoints are:
 - `GET /api/v1/plans/{plan_id}/geometry-3d` — derive renderer-ready boxes from finalized geometry without persisting duplicates
 - `GET /api/v1/plans/{plan_id}/material-quantity` — calculate per-component and total canonical volume without persisting results
 - `GET /api/v1/plans/{plan_id}/material-cost?material_id={material_id}` — price finalized live volume with an active wood material
+- `GET /api/v1/plans/{plan_id}/hardware-quantity` — apply the WUE v1 wood-screw connection rules without persisting results
 
 Generation creates the exact chair, dining-table, or bookshelf defaults documented by the WUE scope and locks overall dimensions in the same database transaction. Each overall axis must be at least 1 mm so proportional defaults remain representable at the stored precision; a failed generation leaves dimensions unlocked. A plan snapshots its furniture type, receives a positive revision number, and permits only one active draft for each furniture item. Component geometry is stored as `Decimal` millimeters. X/Y/Z are min-corner positions, rotation is expressed in degrees, quantity defaults to one, and sort order controls deterministic presentation. Draft components may temporarily omit depth and thickness; the later 3D stage will fail clearly if neither can supply extrusion depth.
 
@@ -115,6 +116,8 @@ Administrative material endpoints are:
 The catalog separates `wood` from `hardware`. Wood supports `mm3`, `cm3`, `m3`, and `board_ft`; hardware uses `piece`. Each dated price snapshots its material unit and contains no currency field. Type or unit changes are blocked after price history exists so old prices cannot silently change meaning. Price listing uses effective date descending, then creation time descending, and intentionally includes future dates. Material quantity remains independent of catalog selection and visual appearance: it multiplies each finalized box's width × height × resolved depth × quantity in cubic millimeters using `Decimal`, returns a transparent component breakdown, and stores no calculated result.
 
 Material costing is also read-only. It requires an active `wood` material and selects the latest price by `effective_date DESC, created_at DESC` without filtering against today's date. Canonical volume conversion uses exact divisors: 1 cm3 = 1,000 mm3, 1 m3 = 1,000,000,000 mm3, and 1 board foot = 2,359,737.216 mm3. Calculations run with a fixed 40-significant-digit Decimal context and return per-component converted quantity, per-component cost, and totals. WUE does not attach currency semantics or hidden currency rounding, and visual appearance never selects or changes the costing material.
+
+Hardware quantity estimation is calculation-only and does not require 3D depth. WUE v1 estimates `wood_screw` hardware at exactly two screws per connection: chairs count legs and the backrest, dining tables count legs, and bookshelves count side-to-top/bottom carcass connections plus shelf-to-side connections. Component `quantity` represents repeated physical pieces and contributes to these counts. Bookshelf back-panel fastening is deliberately excluded. These transparent rules are WUE estimation assumptions, not universal furniture standards.
 
 ## Tests
 

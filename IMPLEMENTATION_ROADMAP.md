@@ -2,7 +2,7 @@
 
 Work proceeds in small, tested modules. Each module receives focused service tests, API tests where relevant, a full regression run, and a clean commit before the next module begins.
 
-Current status: Modules 1 through 10 complete.
+Current status: Modules 1 through 11 complete.
 
 1. **Backend foundation (complete)** — FastAPI application factory, environment settings, PostgreSQL/SQLAlchemy session architecture, health endpoints, pytest setup, and project documentation.
 2. **Projects and furniture (complete)** — UUID-backed project and furniture models plus CRUD APIs constrained to chair, dining table, and bookshelf.
@@ -14,8 +14,9 @@ Current status: Modules 1 through 10 complete.
 8. **Deterministic 3D (complete)** — read-only conversion of finalized components to render geometry, exact depth/thickness fallback, and min-corner-to-center transforms.
 9. **Materials and quantity (complete)** — admin-managed materials and dated price history plus calculation-only volume estimates using canonical units and `Decimal`.
 10. **Material costing (complete)** — calculation-only latest-price selection and Decimal conversions for mm3, cm3, m3, and board feet.
-11. **Hardware estimation and costing** — documented wood-screw connection rules, validated hardware selection, and `Decimal` costs.
-12. **Labor** — separate rate models and transparent, documented WUE v1 hour-estimation rules.
-13. **Quotation and admin APIs** — combined material, hardware, and labor totals without overhead; management kept separate from calculators.
-14. **Frontend workflow** — React/TypeScript feature modules for projects, images, dimensions, editable 2D, Three.js/R3F viewing, estimates, and quotations.
-15. **End-to-end hardening** — real PostgreSQL integration coverage, frontend/backend contract tests, accessibility, error-state polish, and complete regression verification.
+11. **Hardware quantity estimation (complete)** — documented calculation-only wood-screw connection rules with no 3D prerequisite.
+12. **Hardware costing** — validated hardware selection, latest per-piece pricing, and `Decimal` costs.
+13. **Labor** — separate rate models and transparent, documented WUE v1 hour-estimation rules.
+14. **Quotation and admin APIs** — combined material, hardware, and labor totals without overhead; management kept separate from calculators.
+15. **Frontend workflow** — React/TypeScript feature modules for projects, images, dimensions, editable 2D, Three.js/R3F viewing, estimates, and quotations.
+16. **End-to-end hardening** — real PostgreSQL integration coverage, frontend/backend contract tests, accessibility, error-state polish, and complete regression verification.

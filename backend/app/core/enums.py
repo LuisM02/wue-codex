@@ -80,3 +80,12 @@ class MaterialUnit(str, Enum):
     CUBIC_METER = "m3"
     BOARD_FOOT = "board_ft"
     PIECE = "piece"
+
+
+class HardwareConnectionType(str, Enum):
+    """Connection groups exposed by the WUE v1 hardware estimator."""
+
+    LEG = "leg_connections"
+    BACKREST = "backrest_connections"
+    CARCASS = "carcass_connections"
+    SHELF = "shelf_connections"
