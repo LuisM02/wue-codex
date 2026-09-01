@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db_session
 from app.models.furniture_plan import FurniturePlan
+from app.schemas.material_quantity import MaterialQuantityRead
 from app.schemas.plans import (
     ComponentCreate,
     ComponentRead,
@@ -17,10 +18,11 @@ from app.schemas.plans import (
 from app.schemas.reconstruction_3d import PlanGeometry3DRead
 from app.services import dimensions as dimension_service
 from app.services import furniture as furniture_service
+from app.services import material_quantity as quantity_service
 from app.services import plans as plan_service
+from app.services import reconstruction_3d as reconstruction_service
 from app.services.plan_geometry import PlanGeometryRangeError
 from app.services.plan_validation import PlanSemanticValidationError
-from app.services import reconstruction_3d as reconstruction_service
 
 furniture_plans_router = APIRouter(
     prefix="/furniture/{furniture_id}/plans",
@@ -87,6 +89,23 @@ def get_plan_geometry_3d(
     plan = require_plan(session, plan_id)
     try:
         return reconstruction_service.build_plan_geometry(plan)
+    except reconstruction_service.PlanNotFinalizedError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except reconstruction_service.ComponentDepthRequiredError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@plans_router.get(
+    "/{plan_id}/material-quantity",
+    response_model=MaterialQuantityRead,
+)
+def get_material_quantity(
+    plan_id: UUID,
+    session: SessionDependency,
+) -> MaterialQuantityRead:
+    plan = require_plan(session, plan_id)
+    try:
+        return quantity_service.calculate_material_quantity(plan)
     except reconstruction_service.PlanNotFinalizedError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except reconstruction_service.ComponentDepthRequiredError as exc:

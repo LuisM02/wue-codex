@@ -63,3 +63,20 @@ class ComponentDepthSource(str, Enum):
 
     COMPONENT_DEPTH = "component_depth"
     THICKNESS = "thickness"
+
+
+class MaterialType(str, Enum):
+    """Administrative material categories used by WUE calculations."""
+
+    WOOD = "wood"
+    HARDWARE = "hardware"
+
+
+class MaterialUnit(str, Enum):
+    """Supported catalog price units without currency semantics."""
+
+    CUBIC_MILLIMETER = "mm3"
+    CUBIC_CENTIMETER = "cm3"
+    CUBIC_METER = "m3"
+    BOARD_FOOT = "board_ft"
+    PIECE = "piece"
