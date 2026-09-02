@@ -2,7 +2,7 @@
 
 Work proceeds in small, tested modules. Each module receives focused service tests, API tests where relevant, a full regression run, and a clean commit before the next module begins.
 
-Current status: Modules 1 through 17, the parametric CAD editor, Module 18A, Module 18B1, and Module 19A complete.
+Current status: Modules 1 through 17, the parametric CAD editor, Module 18A, Module 18B1, Module 19A, and Module 19B complete.
 
 1. **Backend foundation (complete)** — FastAPI application factory, environment settings, PostgreSQL/SQLAlchemy session architecture, health endpoints, pytest setup, and project documentation.
 2. **Projects and furniture (complete)** — UUID-backed project and furniture models plus CRUD APIs constrained to chair, dining table, and bookshelf.
@@ -29,5 +29,5 @@ Current status: Modules 1 through 17, the parametric CAD editor, Module 18A, Mod
     - **18C — furniture-part fine-tuning:** render licensed part-annotated furniture data, collect user-corrected real WUE profiles, train/evaluate the smaller part detector, and version its dataset/model rather than attempting to train a 3D foundation model from scratch.
 19. **End-to-end hardening**
     - **19A — isolated real PostgreSQL verification (complete):** each integration session creates, migrates, tests, and removes a uniquely named disposable database, so retained rows in a shared test database cannot contaminate results. The complete 332-test backend suite passes on PostgreSQL 18.
-    - **19B — contract and accessibility hardening (next):** add frontend/backend contract checks, keyboard and screen-reader verification, and focused error-state coverage.
-    - **19C — release regression:** run the complete backend, worker, frontend, production-build, and browser workflow matrix before the AI training phase.
+    - **19B — contract and accessibility hardening (complete):** a shared manifest is exercised by every frontend API method and checked against FastAPI OpenAPI; expected optional 404s remain quiet while genuine partial-load failures identify the affected resource. CAD toolbar/toggle/status semantics and keyboard-only selection were verified in the live app.
+    - **19C — release regression (next):** run the complete backend, worker, frontend, production-build, and browser workflow matrix before the AI training phase.

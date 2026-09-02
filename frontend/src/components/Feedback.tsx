@@ -46,7 +46,7 @@ export function EmptyState({ title, children }: { title: string; children: React
 
 export function BusyLabel({ children = "Working…" }: { children?: ReactNode }) {
   return (
-    <span className="busy-label">
+    <span className="busy-label" role="status" aria-live="polite">
       <span className="spinner" aria-hidden="true" />
       {children}
     </span>

@@ -28,6 +28,7 @@ function ToolButton({
   icon,
   title,
   active = false,
+  toggle = false,
   disabled = false,
   onClick,
 }: {
@@ -35,6 +36,7 @@ function ToolButton({
   icon: string;
   title: string;
   active?: boolean;
+  toggle?: boolean;
   disabled?: boolean;
   onClick: () => void;
 }) {
@@ -43,7 +45,7 @@ function ToolButton({
       type="button"
       className={`cad-tool${active ? " is-active" : ""}`}
       title={title}
-      aria-pressed={active}
+      aria-pressed={toggle ? active : undefined}
       disabled={disabled}
       onClick={onClick}
     >
@@ -55,9 +57,9 @@ function ToolButton({
 
 export function EditorToolbar(props: Props) {
   return (
-    <header className="cad-toolbar" aria-label="2D editor tools">
+    <header className="cad-toolbar" role="toolbar" aria-label="2D editor tools">
       <div className="cad-toolbar__group">
-        <ToolButton label="Select" icon="⌖" title="Select and move components" active onClick={() => undefined} />
+        <ToolButton label="Select" icon="⌖" title="Select and move components" active toggle onClick={() => undefined} />
       </div>
       <div className="cad-toolbar__group" aria-label="Orthographic view">
         {(["front", "side", "top"] as const).map((view) => (
@@ -67,15 +69,16 @@ export function EditorToolbar(props: Props) {
             icon={view === "front" ? "▣" : view === "side" ? "▥" : "▤"}
             title={`Show ${view} orthographic view`}
             active={props.view === view}
+            toggle
             onClick={() => props.onView(view)}
           />
         ))}
       </div>
       <div className="cad-toolbar__group">
-        <ToolButton label="Grid" icon="#" title="Toggle drawing grid" active={props.gridVisible} onClick={props.onGrid} />
-        <ToolButton label="Snap" icon="⊹" title="Snap movement and resizing to the grid and nearby edges" active={props.snapEnabled} onClick={props.onSnap} />
+        <ToolButton label="Grid" icon="#" title="Toggle drawing grid" active={props.gridVisible} toggle onClick={props.onGrid} />
+        <ToolButton label="Snap" icon="⊹" title="Snap movement and resizing to the grid and nearby edges" active={props.snapEnabled} toggle onClick={props.onSnap} />
         {props.hasPhoto && (
-          <ToolButton label="Photo" icon="◩" title="Toggle the front reference photograph" active={props.photoVisible} disabled={props.view !== "front"} onClick={props.onPhoto} />
+          <ToolButton label="Photo" icon="◩" title="Toggle the front reference photograph" active={props.photoVisible} toggle disabled={props.view !== "front"} onClick={props.onPhoto} />
         )}
       </div>
       <div className="cad-toolbar__group">
@@ -86,7 +89,7 @@ export function EditorToolbar(props: Props) {
         <ToolButton label="Zoom in" icon="＋" title="Zoom in (+)" onClick={props.onZoomIn} />
         <ToolButton label="Zoom out" icon="−" title="Zoom out (-)" onClick={props.onZoomOut} />
         <ToolButton label="Fit" icon="⛶" title="Fit all components to view" onClick={props.onFit} />
-        <span className="cad-zoom-readout">{Math.round(props.zoom * 100)}%</span>
+        <span className="cad-zoom-readout" role="status" aria-live="polite" aria-label={`Zoom ${Math.round(props.zoom * 100)} percent`}>{Math.round(props.zoom * 100)}%</span>
       </div>
       <button
         type="button"

@@ -178,6 +178,8 @@ pytest
 
 The database named in `WUE_TEST_DATABASE_URL` is used only as a safe naming and connection base; its existing rows are not read or deleted. Migration state and ORM metadata are checked for drift inside the disposable database on every complete run.
 
+`contracts/frontend-api.json` is the shared route contract for the web application. A frontend test invokes every API-client operation and compares the resulting methods and canonical paths with that manifest; a backend test compares the same manifest with FastAPI OpenAPI. A route used by one side but missing from the other therefore fails regression testing before deployment.
+
 ## Frontend setup
 
 Install and run the web interface in a second terminal after starting the API:

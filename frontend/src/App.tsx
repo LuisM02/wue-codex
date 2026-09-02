@@ -8,6 +8,7 @@ import { ImageWorkspace } from "./features/images/ImageWorkspace";
 import { PlanEditor } from "./features/plans/PlanEditor";
 import { ProjectSetup } from "./features/projects/ProjectSetup";
 import { furnitureLabel } from "./lib/format";
+import { settledFailureMessage } from "./lib/loadState";
 import { canOpenStep, type WorkflowContext, type WorkflowStepId } from "./lib/workflow";
 import { api } from "./services/apiClient";
 import type {
@@ -42,7 +43,7 @@ export default function App() {
     let current = true;
     api.projects.list()
       .then((items) => { if (current) setProjects(items); })
-      .catch((reason: Error) => { if (current) setError(reason.message); })
+      .catch((reason: Error) => { if (current) setError(`Could not load projects. ${reason.message}`); })
       .finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
   }, []);
@@ -54,6 +55,7 @@ export default function App() {
     setPlan(null);
     if (!furniture) return;
     let current = true;
+    setError(null);
     setLoadingPiece(true);
     Promise.allSettled([
       api.images.list(furniture.id),
@@ -69,6 +71,10 @@ export default function App() {
         const ordered = [...planResult.value].sort((a, b) => b.revision - a.revision);
         setPlan(ordered.find((item) => item.status === "draft") ?? ordered[0]);
       }
+      setError(settledFailureMessage(
+        ["photos", "recognition", "dimensions", "2D plans"],
+        [imageResult, classificationResult, dimensionsResult, planResult],
+      ));
     }).finally(() => {
       if (current) setLoadingPiece(false);
     });
@@ -84,12 +90,14 @@ export default function App() {
   }), [project, furniture, images, dimensions, plan]);
 
   function changeProject(value: Project | null) {
+    setError(null);
     setProject(value);
     setFurniture(null);
     setStep("project");
   }
 
   function changeFurniture(value: Furniture | null) {
+    setError(null);
     setFurniture(value);
     setStep("project");
   }
@@ -142,9 +150,9 @@ export default function App() {
         </div>
       </aside>
 
-      <main className="main-workspace">
-        {error && <Notice tone="danger">Could not load projects: {error}</Notice>}
-        {loadingPiece && <div className="piece-loading"><BusyLabel>Loading saved work…</BusyLabel></div>}
+      <main className="main-workspace" aria-busy={loadingPiece}>
+        {error && <Notice tone="danger">{error}</Notice>}
+        {loadingPiece && <div className="piece-loading" aria-live="polite"><BusyLabel>Loading saved work…</BusyLabel></div>}
 
         {step === "project" && (
           <ProjectSetup
