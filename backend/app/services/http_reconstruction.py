@@ -87,8 +87,13 @@ class HttpFurnitureReconstructor:
                 "The local photo reconstruction service could not complete the analysis"
             )
         if response.status_code >= 400:
+            try:
+                detail = str(response.json().get("detail", "")).strip()
+            except ValueError:
+                detail = ""
             raise InvalidReconstructionOutputError(
-                "The local photo reconstruction service rejected the image set"
+                detail
+                or "The local photo reconstruction service rejected the image set"
             )
         try:
             payload = WorkerResponse.model_validate(response.json())

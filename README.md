@@ -2,13 +2,14 @@
 
 WUE (Wood U Estimate) is an AI-assisted system for reconstructing wooden furniture, estimating materials and labor, and producing quotations. This repository is a new, independent implementation and supports exactly three furniture types: `chair`, `dining_table`, and `bookshelf`.
 
-Modules 1 through 17 plus the first vision-reconstruction increment establish the backend foundation, persisted domain resources, photo-first five-view workflow, replaceable AI boundaries, canonical overall dimensions, photo-derived part proposals, guided part-by-part 2D editing, validated immutable design revisions, renderer-ready 3D geometry, separate administrative material and labor-rate catalogs, calculation-only cost domains, immutable quotation snapshots, and the guided web interface. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, reconstruction provenance, deterministic calculations, and health endpoints.
+Modules 1 through 17 plus the photo-reconstruction contract and runnable local vision baseline establish the backend foundation, persisted domain resources, photo-first five-view workflow, replaceable AI boundaries, canonical overall dimensions, photo-derived part proposals, guided part-by-part 2D editing, validated immutable design revisions, renderer-ready 3D geometry, separate administrative material and labor-rate catalogs, calculation-only cost domains, immutable quotation snapshots, and the guided web interface. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, reconstruction provenance, deterministic calculations, and health endpoints.
 
 ## Repository layout
 
 ```text
 backend/                    FastAPI backend and tests
 frontend/                   React, TypeScript, Vite, Three.js, and Vitest app
+reconstruction-worker/      Isolated five-view recognition/reconstruction service
 IMPLEMENTATION_ROADMAP.md   Incremental backend/frontend delivery plan
 ```
 
@@ -47,6 +48,15 @@ Set-Location backend
 uvicorn app.main:app --reload
 ```
 
+To use automatic recognition and the current photo-derived baseline, first run the isolated worker in another terminal:
+
+```powershell
+Set-Location reconstruction-worker
+..\.venv\Scripts\python.exe -m uvicorn wue_worker.main:app --host 127.0.0.1 --port 8010
+```
+
+Then set `WUE_CLASSIFICATION_PROVIDER=http` and `WUE_RECONSTRUCTION_PROVIDER=http` before starting the API. Both service URLs default to `http://127.0.0.1:8010`. Leave either provider as `unconfigured` when an unavailable worker should produce an explicit 503 instead of a fallback result.
+
 The initial endpoints are:
 
 - `GET /api/v1/health` — confirms the API process is healthy without touching the database.
@@ -75,14 +85,16 @@ Classification endpoints are:
 - `POST /api/v1/furniture/{furniture_id}/classification` — classify the complete five-view set and persist the latest result
 - `GET /api/v1/furniture/{furniture_id}/classification` — retrieve the latest result
 
-Classification requires all five views and verifies each stored object's SHA-256 integrity before invoking an adapter. The adapter can return only chair, dining table, or bookshelf. A successful prediction updates the furniture type; deleting a source image clears the derived type, while an explicit type correction invalidates both the stored classifier result and any derived geometry. The default adapter deliberately returns HTTP 503 because no real AI model is configured—it never fabricates a label.
+Classification requires all five views and verifies each stored object's SHA-256 integrity before invoking an adapter. The adapter can return only chair, dining table, or bookshelf. A successful prediction updates the furniture type; deleting a source image clears the derived type, while an explicit type correction invalidates both the stored classifier result and any derived geometry. The default adapter deliberately returns HTTP 503 because no provider is configured—it never fabricates a label. Set `WUE_CLASSIFICATION_PROVIDER=http` to use the isolated local worker.
 
 Photo reconstruction endpoints are:
 
 - `POST /api/v1/furniture/{furniture_id}/reconstruction` — send the exact five verified images, recognized type, and canonical scale to the configured AI adapter
 - `GET /api/v1/furniture/{furniture_id}/reconstruction` — read the latest model/version, input signature, warnings, confidence, and detected parts
 
-Each part records which source views support it, confidence, dimensions, 3-axis pose, and either a bounded box or an editable front-facing polygon profile. Changing an image, recognized type, or unlocked dimension set invalidates the proposal. The default reconstruction adapter returns HTTP 503 with an explicit message that WUE will not generate a generic substitute. Set `WUE_RECONSTRUCTION_PROVIDER=http` to use the isolated local GPU service at `WUE_RECONSTRUCTION_SERVICE_URL`; the service receives five multipart image fields plus scale and checksum metadata. Large model dependencies and checkpoints do not run inside the business API.
+Each part records which source views support it, confidence, dimensions, 3-axis pose, and either a bounded box or an editable front-facing polygon profile. Changing an image, recognized type, or unlocked dimension set invalidates the proposal. The default reconstruction adapter returns HTTP 503 with an explicit message that WUE will not generate a generic substitute. Set `WUE_RECONSTRUCTION_PROVIDER=http` to use the isolated local service at `WUE_RECONSTRUCTION_SERVICE_URL`; the service receives five multipart image fields plus scale and checksum metadata. Large model dependencies and checkpoints do not run inside the business API.
+
+The runnable worker under `reconstruction-worker/` is the first photo-derived baseline. It checks that all five files are distinct, compares opposite views, rejects obvious orientation errors or unusable backgrounds, detects the furniture class from image structure, traces visible part silhouettes, and uses a side view for depth. Its model-status endpoint clearly reports that it is CPU silhouette analysis—not SAM 2 or dense neural multi-view reconstruction—and its returned warnings keep hidden geometry visibly provisional. Start it on port 8010, then set both classification and reconstruction providers to `http`.
 
 Overall dimension endpoints are:
 

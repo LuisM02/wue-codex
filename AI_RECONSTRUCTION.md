@@ -51,6 +51,12 @@ Do not train a 3D foundation model from scratch. Start with pretrained reconstru
 4. Fine-tune on real corrections only after a reviewable dataset split exists.
 5. Evaluate unseen furniture by silhouette intersection-over-union, part precision/recall, normalized dimension error, cross-view reprojection error, and user correction time.
 
+## Implemented local baseline worker
+
+`reconstruction-worker/` now supplies health/model-status, five-view classification, and reconstruction endpoints. It rejects duplicate files, incoherent opposite views, unusable silhouettes, checksum mismatches, and strongly mismatched view orientation. With a plain contrasting background it traces the actual visible silhouette into part profiles, fits front geometry to side-view depth, and returns explicit low-confidence warnings for hidden surfaces. Regression coverage proves visibly different chair silhouettes produce different editable profiles.
+
+This baseline deliberately identifies itself as `wue-five-view-silhouette`; it is not presented as the final neural system and does not claim GPU use. Configure both backend HTTP providers to use it. This makes the full workflow runnable while preserving an honest model-status response.
+
 ## Next implementation increment
 
-Create the worker in its own Python 3.11/CUDA 12 environment, implement health/model-status endpoints, download only approved checkpoints, and first return one complete chair through the already-tested HTTP contract. Then add table and bookshelf evaluation before enabling the worker by default.
+Replace the worker's foreground segmenter with an approved SAM 2 checkpoint and add pose-free dense multi-view geometry in its own Python/CUDA environment. Then evaluate chair, table, and bookshelf photo sets against measured reference geometry before raising confidence or enabling it by default. The saved reconstruction contract does not need to change.
