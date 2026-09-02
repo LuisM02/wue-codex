@@ -2,7 +2,7 @@
 
 Work proceeds in small, tested modules. Each module receives focused service tests, API tests where relevant, a full regression run, and a clean commit before the next module begins.
 
-Current status: Modules 1 through 17, Module 18A, and Module 18B1 complete.
+Current status: Modules 1 through 17, the parametric CAD editor, Module 18A, Module 18B1, and Module 19A complete.
 
 1. **Backend foundation (complete)** — FastAPI application factory, environment settings, PostgreSQL/SQLAlchemy session architecture, health endpoints, pytest setup, and project documentation.
 2. **Projects and furniture (complete)** — UUID-backed project and furniture models plus CRUD APIs constrained to chair, dining table, and bookshelf.
@@ -21,9 +21,13 @@ Current status: Modules 1 through 17, Module 18A, and Module 18B1 complete.
 15. **Quotation and admin APIs (complete)** — exact material, hardware, and labor totals without overhead plus immutable historical snapshots.
 16. **Frontend workflow (complete)** — responsive React/TypeScript feature modules for projects, five-view images, dimensions, editable 2D plans, lazy-loaded Three.js/R3F viewing, estimates, and immutable quotations.
 17. **Photo-first workflow and guided part editing (complete)** — furniture starts unclassified, plan generation waits for recognition, source-image changes invalidate derived identity, and the 2D workspace guides users through one highlighted part at a time with live size and position previews plus an optional photo overlay.
+    - **Parametric CAD editor (complete):** desktop three-panel workspace with canonical Front/Side/Top projection, direct drag and resize, exact properties, grid and edge snapping, zoom/pan, dimensions, contextual part creation, semantic warnings, bounded Undo/Redo, backend persistence with rollback, and finalized read-only inspection.
 18. **Vision reconstruction provider**
     - **18A — photo-derived reconstruction contract (complete):** persist input-photo signatures, provider/model provenance, warnings, per-part source views and confidence, editable traced profiles, and full rotations. Initial plan creation now requires this result and never calls the old generic template generator. Source changes invalidate reconstruction. Profile outlines drive 2D, 3D extrusion, and polygon-area material quantity.
     - **18B1 — runnable local silhouette worker (complete):** isolated health/model-status, automatic three-class recognition, checksum and five-view validation, opposite-view consistency checks, wrong-orientation rejection, photo-specific silhouette tracing, side-depth fitting, semantic structural regions, confidence/warnings, and HTTP integration. This dependency-light baseline is intentionally identified as non-neural and works best against a plain background.
     - **18B2 — local pretrained inference worker (next):** replace baseline foreground extraction with SAM 2, then sequentially run pose-free multi-view geometry, part proposals, cross-view fitting, and uncertainty scoring on the RTX 4070 laptop GPU. Licensed checkpoints remain deliberately separate until approved.
     - **18C — furniture-part fine-tuning:** render licensed part-annotated furniture data, collect user-corrected real WUE profiles, train/evaluate the smaller part detector, and version its dataset/model rather than attempting to train a 3D foundation model from scratch.
-19. **End-to-end hardening** — real PostgreSQL integration coverage, frontend/backend contract tests, accessibility, error-state polish, and complete regression verification.
+19. **End-to-end hardening**
+    - **19A — isolated real PostgreSQL verification (complete):** each integration session creates, migrates, tests, and removes a uniquely named disposable database, so retained rows in a shared test database cannot contaminate results. The complete 332-test backend suite passes on PostgreSQL 18.
+    - **19B — contract and accessibility hardening (next):** add frontend/backend contract checks, keyboard and screen-reader verification, and focused error-state coverage.
+    - **19C — release regression:** run the complete backend, worker, frontend, production-build, and browser workflow matrix before the AI training phase.

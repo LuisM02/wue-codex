@@ -169,14 +169,14 @@ Run the fast suite from `backend`:
 pytest -m "not integration"
 ```
 
-Database/API integration tests run Alembic against a real PostgreSQL database and are skipped unless `WUE_TEST_DATABASE_URL` is set. Each test uses an outer rollback transaction, so test records do not persist. After creating a dedicated test database, run the complete suite:
+Database/API integration tests run Alembic against a real PostgreSQL database and are skipped unless `WUE_TEST_DATABASE_URL` is set. The configured PostgreSQL user must be allowed to create databases. The test session creates a uniquely named disposable sibling database, runs every migration and test there, and drops only that temporary database afterward. Per-test outer rollback transactions provide a second layer of isolation. Run the complete suite with:
 
 ```powershell
 $env:WUE_TEST_DATABASE_URL = "postgresql+psycopg2://postgres:postgres@localhost:5432/wue_codex_test_db"
 pytest
 ```
 
-The test database must be dedicated to WUE tests. Migration state and ORM metadata are checked for drift on every complete run.
+The database named in `WUE_TEST_DATABASE_URL` is used only as a safe naming and connection base; its existing rows are not read or deleted. Migration state and ORM metadata are checked for drift inside the disposable database on every complete run.
 
 ## Frontend setup
 

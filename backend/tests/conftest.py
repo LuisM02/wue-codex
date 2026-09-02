@@ -5,13 +5,17 @@ from collections.abc import Generator
 from io import BytesIO
 from pathlib import Path
 from typing import Callable
+from uuid import uuid4
 
+import psycopg2
 import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
 from PIL import Image
+from psycopg2 import sql
 from sqlalchemy import Engine, create_engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
@@ -31,11 +35,49 @@ def client() -> Generator[TestClient, None, None]:
 
 
 @pytest.fixture(scope="session")
-def integration_database_url() -> str:
-    database_url = os.getenv("WUE_TEST_DATABASE_URL")
-    if not database_url:
+def integration_database_url() -> Generator[str, None, None]:
+    """Create a disposable sibling database for one PostgreSQL test session."""
+    configured_url = os.getenv("WUE_TEST_DATABASE_URL")
+    if not configured_url:
         pytest.skip("WUE_TEST_DATABASE_URL is not configured")
-    return Settings(_env_file=None, database_url=database_url).database_url
+    base_url = make_url(
+        Settings(_env_file=None, database_url=configured_url).database_url
+    )
+    if not base_url.database or base_url.database in {"postgres", "template0", "template1"}:
+        pytest.fail("WUE_TEST_DATABASE_URL must name a dedicated non-system database")
+
+    database_name = (
+        f"{base_url.database[:32]}_pytest_{os.getpid()}_{uuid4().hex[:8]}"
+    )
+    admin_connection = psycopg2.connect(
+        dbname="postgres",
+        host=base_url.host,
+        port=base_url.port,
+        user=base_url.username,
+        password=base_url.password,
+    )
+    admin_connection.autocommit = True
+    try:
+        with admin_connection.cursor() as cursor:
+            cursor.execute(
+                sql.SQL("CREATE DATABASE {}").format(sql.Identifier(database_name))
+            )
+        yield base_url.set(database=database_name).render_as_string(
+            hide_password=False
+        )
+    finally:
+        with admin_connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                "WHERE datname = %s AND pid <> pg_backend_pid()",
+                (database_name,),
+            )
+            cursor.execute(
+                sql.SQL("DROP DATABASE IF EXISTS {}").format(
+                    sql.Identifier(database_name)
+                )
+            )
+        admin_connection.close()
 
 
 @pytest.fixture(scope="session")
