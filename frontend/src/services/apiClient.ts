@@ -1,7 +1,7 @@
 import type {
   CompleteCost, CostSelection, Furniture, FurnitureClassification, FurnitureDimensions, FurnitureReconstruction,
   FurnitureImage, FurniturePlan, FurnitureType, HardwareQuantity, ImageView, LaborQuantity,
-  LaborRate, Material, MaterialQuantity, PlanComponent, PlanGeometry, Project, Quotation, UUID,
+  LaborRate, Material, MaterialQuantity, PlanComponent, PlanComponentPayload, PlanGeometry, Project, Quotation, UUID,
 } from "../types/api";
 
 const API_ROOT = "/api/v1";
@@ -87,9 +87,14 @@ export const api = {
   },
   plans: {
     list: (furnitureId: UUID) => request<FurniturePlan[]>(`/furniture/${furnitureId}/plans`),
+    get: (planId: UUID) => request<FurniturePlan>(`/plans/${planId}`),
     generate: (furnitureId: UUID) => request<FurniturePlan>(`/furniture/${furnitureId}/plans`, { method: "POST" }),
+    addComponent: (planId: UUID, payload: PlanComponentPayload) =>
+      request<PlanComponent>(`/plans/${planId}/components`, { method: "POST", body: JSON.stringify(payload) }),
     updateComponent: (planId: UUID, componentId: UUID, payload: Partial<PlanComponent>) =>
       request<PlanComponent>(`/plans/${planId}/components/${componentId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+    deleteComponent: (planId: UUID, componentId: UUID) =>
+      request<void>(`/plans/${planId}/components/${componentId}`, { method: "DELETE" }),
     finalize: (planId: UUID) => request<FurniturePlan>(`/plans/${planId}/finalize`, { method: "POST" }),
     revise: (planId: UUID) => request<FurniturePlan>(`/plans/${planId}/revisions`, { method: "POST" }),
     geometry: (planId: UUID) => request<PlanGeometry>(`/plans/${planId}/geometry-3d`),

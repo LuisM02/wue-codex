@@ -94,6 +94,27 @@ export interface PlanComponent {
   updated_at: string;
 }
 
+export type PlanComponentPayload = Pick<
+  PlanComponent,
+  | "component_name"
+  | "component_type"
+  | "width"
+  | "height"
+  | "depth"
+  | "thickness"
+  | "x"
+  | "y"
+  | "z"
+  | "rotation"
+  | "rotation_x"
+  | "rotation_y"
+  | "rotation_z"
+  | "geometry_kind"
+  | "profile_points"
+  | "quantity"
+  | "sort_order"
+>;
+
 export interface FurniturePlan {
   id: UUID;
   furniture_id: UUID;
