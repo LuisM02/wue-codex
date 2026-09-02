@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from app.models.furniture_dimensions import FurnitureDimensions
     from app.models.furniture_image import FurnitureImage
     from app.models.furniture_plan import FurniturePlan
+    from app.models.furniture_reconstruction import FurnitureReconstruction
     from app.models.project import Project
 
 
@@ -74,4 +75,10 @@ class Furniture(TimestampMixin, Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="FurniturePlan.revision",
+    )
+    reconstruction: Mapped["FurnitureReconstruction | None"] = relationship(
+        back_populates="furniture",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
     )

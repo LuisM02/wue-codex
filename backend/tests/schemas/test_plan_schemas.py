@@ -22,6 +22,9 @@ def test_component_input_normalizes_name_and_defaults_transform() -> None:
     assert component.component_name == "custom_panel"
     assert component.x == component.y == component.z == 0
     assert component.rotation == 0
+    assert component.rotation_x == component.rotation_y == component.rotation_z == 0
+    assert component.geometry_kind.value == "box"
+    assert component.profile_points is None
     assert component.quantity == 1
     assert component.sort_order == 0
     assert component.depth is None
@@ -71,3 +74,25 @@ def test_component_update_can_clear_optional_depth_fields() -> None:
         "depth": None,
         "thickness": None,
     }
+
+
+def test_extruded_profile_requires_a_real_outline_inside_part_bounds() -> None:
+    component = ComponentCreate.model_validate({
+        **valid_component(),
+        "geometry_kind": "extruded_profile",
+        "profile_points": [
+            {"u": 0, "v": 0},
+            {"u": 500, "v": 0},
+            {"u": 400, "v": 20},
+            {"u": 20, "v": 20},
+        ],
+    })
+
+    assert len(component.profile_points or []) == 4
+
+    with pytest.raises(ValidationError):
+        ComponentCreate.model_validate({
+            **valid_component(),
+            "geometry_kind": "extruded_profile",
+            "profile_points": [{"u": 0, "v": 0}, {"u": 600, "v": 0}, {"u": 0, "v": 20}],
+        })

@@ -6,7 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from app.core.enums import ComponentDepthSource, ComponentType, FurnitureType
+from app.core.enums import ComponentDepthSource, ComponentType, FurnitureType, GeometryKind
+from app.schemas.plans import ProfilePoint
 
 
 class Vector3DRead(BaseModel):
@@ -36,6 +37,9 @@ class ComponentGeometry3DRead(BaseModel):
     center: Vector3DRead
     depth_source: ComponentDepthSource
     rotation_degrees: Decimal
+    rotation: Vector3DRead
+    geometry_kind: GeometryKind
+    profile_points: list[ProfilePoint] | None
     quantity: int
     sort_order: int
 

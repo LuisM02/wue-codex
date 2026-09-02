@@ -37,16 +37,23 @@ class MaterialQuantity:
 
 
 def calculate_material_quantity(plan: FurniturePlan) -> MaterialQuantity:
-    """Sum canonical rectangular volumes without persisting calculated data."""
+    """Sum boxes or exact front-profile extrusions without persistence."""
     geometry = build_plan_geometry(plan)
     components: list[ComponentMaterialQuantity] = []
     total_volume = Decimal("0")
     for item in geometry.components:
-        single_piece_volume = (
-            item.dimensions.width
-            * item.dimensions.height
-            * item.dimensions.depth
-        )
+        if item.profile_points is None:
+            face_area = item.dimensions.width * item.dimensions.height
+        else:
+            twice_area = abs(
+                sum(
+                    point.u * item.profile_points[(index + 1) % len(item.profile_points)].v
+                    - item.profile_points[(index + 1) % len(item.profile_points)].u * point.v
+                    for index, point in enumerate(item.profile_points)
+                )
+            )
+            face_area = twice_area / Decimal("2")
+        single_piece_volume = face_area * item.dimensions.depth
         component_total = single_piece_volume * item.quantity
         components.append(
             ComponentMaterialQuantity(

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.models.furniture_plan import FurniturePlan
 from app.models.quotation import Quotation
+from tests.support.photo_reconstruction import prepare_test_reconstruction
 
 pytestmark = pytest.mark.integration
 
@@ -25,6 +26,7 @@ def create_plan(client: TestClient, *, finalize: bool = True) -> dict:
         f"/api/v1/furniture/{furniture['id']}/dimensions",
         json={"width": 1000, "height": 1200, "depth": 600, "unit": "mm"},
     ).status_code == 201
+    prepare_test_reconstruction(client, furniture["id"])
     draft = client.post(f"/api/v1/furniture/{furniture['id']}/plans").json()
     if not finalize:
         return draft

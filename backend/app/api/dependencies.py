@@ -8,6 +8,11 @@ from app.services.classification import (
     UnconfiguredFurnitureClassifier,
 )
 from app.services.image_storage import LocalImageStorage
+from app.services.http_reconstruction import HttpFurnitureReconstructor
+from app.services.photo_reconstruction import (
+    FurnitureReconstructor,
+    UnconfiguredFurnitureReconstructor,
+)
 
 
 @lru_cache
@@ -20,3 +25,15 @@ def get_image_storage() -> LocalImageStorage:
 def get_furniture_classifier() -> FurnitureClassifier:
     """Return the configured classifier adapter; unavailable by default."""
     return UnconfiguredFurnitureClassifier()
+
+
+@lru_cache
+def get_furniture_reconstructor() -> FurnitureReconstructor:
+    """Return the configured multi-view reconstruction adapter."""
+    settings = get_settings()
+    if settings.reconstruction_provider == "http":
+        return HttpFurnitureReconstructor(
+            settings.reconstruction_service_url,
+            settings.reconstruction_timeout_seconds,
+        )
+    return UnconfiguredFurnitureReconstructor()

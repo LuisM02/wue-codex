@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.core.enums import ComponentType, FurnitureType, PlanStatus
+from app.core.enums import ComponentType, FurnitureType, GeometryKind, PlanStatus
 from app.services.material_quantity import calculate_material_quantity
 from app.services.reconstruction_3d import (
     ComponentDepthRequiredError,
@@ -27,6 +27,11 @@ class Component:
     y: Decimal = Decimal("0")
     z: Decimal = Decimal("0")
     rotation: Decimal = Decimal("0")
+    rotation_x: Decimal = Decimal("0")
+    rotation_y: Decimal = Decimal("0")
+    rotation_z: Decimal = Decimal("0")
+    geometry_kind: GeometryKind = GeometryKind.BOX
+    profile_points: list[dict[str, str]] | None = None
     quantity: int = 1
     sort_order: int = 0
 
@@ -127,6 +132,20 @@ def test_calculation_is_deterministic_read_only_and_ignores_position() -> None:
     assert first.total_volume_mm3 == expected
     assert first.components[0].source_component_id == source_component.id
     assert source.components == (source_component,)
+
+
+def test_extruded_profile_uses_polygon_area_instead_of_bounding_box() -> None:
+    triangle = component("profile", width="10", height="10", depth="4")
+    object.__setattr__(triangle, "geometry_kind", GeometryKind.EXTRUDED_PROFILE)
+    object.__setattr__(
+        triangle,
+        "profile_points",
+        [{"u": "0", "v": "0"}, {"u": "10", "v": "0"}, {"u": "0", "v": "10"}],
+    )
+
+    result = calculate_material_quantity(plan(triangle))  # type: ignore[arg-type]
+
+    assert result.total_volume_mm3 == Decimal("200")
 
 
 def test_draft_plan_is_rejected() -> None:

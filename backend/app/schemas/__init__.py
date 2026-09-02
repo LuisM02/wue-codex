@@ -5,6 +5,7 @@ from app.schemas.dimensions import FurnitureDimensionsRead, FurnitureDimensionsW
 from app.schemas.furniture import FurnitureCreate, FurnitureRead, FurnitureUpdate
 from app.schemas.furniture_image import FurnitureImageRead
 from app.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate
+from app.schemas.photo_reconstruction import FurnitureReconstructionRead
 
 __all__ = [
     "FurnitureClassificationRead",
@@ -13,6 +14,7 @@ __all__ = [
     "FurnitureCreate",
     "FurnitureImageRead",
     "FurnitureRead",
+    "FurnitureReconstructionRead",
     "FurnitureUpdate",
     "ProjectCreate",
     "ProjectRead",

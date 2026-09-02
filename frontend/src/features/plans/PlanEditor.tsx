@@ -37,19 +37,28 @@ function PlanDrawing({
       y: Number(component.y),
       width: Number(component.width),
       height: Number(component.height),
+      geometryKind: component.geometry_kind,
+      profilePoints: component.profile_points?.map((point) => ({ u: Number(point.u), v: Number(point.v) })) ?? null,
     }));
     const minX = Math.min(...raw.map((shape) => shape.x));
     const minY = Math.min(...raw.map((shape) => shape.y));
     const maxX = Math.max(...raw.map((shape) => shape.x + shape.width));
     const maxY = Math.max(...raw.map((shape) => shape.y + shape.height));
     const scale = Math.min(610 / Math.max(maxX - minX, 1), 340 / Math.max(maxY - minY, 1));
-    return raw.map((shape) => ({
-      ...shape,
-      x: 55 + (shape.x - minX) * scale,
-      y: 370 - (shape.y - minY + shape.height) * scale,
-      width: Math.max(shape.width * scale, 2),
-      height: Math.max(shape.height * scale, 2),
-    }));
+    return raw.map((shape) => {
+      const screenX = 55 + (shape.x - minX) * scale;
+      const screenY = 370 - (shape.y - minY + shape.height) * scale;
+      return {
+        ...shape,
+        x: screenX,
+        y: screenY,
+        width: Math.max(shape.width * scale, 2),
+        height: Math.max(shape.height * scale, 2),
+        polygon: shape.profilePoints?.map((point) =>
+          `${screenX + point.u * scale},${screenY + (shape.height - point.v) * scale}`
+        ).join(" ") ?? null,
+      };
+    });
   }, [components]);
 
   return (
@@ -66,7 +75,15 @@ function PlanDrawing({
       <line className="plan-ground" x1="28" y1="372" x2="692" y2="372" />
       {shapes.map((shape) => (
         <g key={shape.id}>
-          <rect
+          {shape.geometryKind === "extruded_profile" && shape.polygon ? <polygon
+            className={`plan-shape plan-shape--${shape.type}${selectedId === shape.id ? " is-selected" : ""}`}
+            points={shape.polygon}
+            tabIndex={0}
+            role="button"
+            aria-label={`Edit ${shape.name}`}
+            onClick={() => onSelect(shape.id)}
+            onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onSelect(shape.id); }}
+          /> : <rect
             className={`plan-shape plan-shape--${shape.type}${selectedId === shape.id ? " is-selected" : ""}`}
             x={shape.x}
             y={shape.y}
@@ -78,7 +95,7 @@ function PlanDrawing({
             aria-label={`Edit ${shape.name}`}
             onClick={() => onSelect(shape.id)}
             onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onSelect(shape.id); }}
-          />
+          />}
           {shape.width > 56 && shape.height > 22 && (
             <text x={shape.x + shape.width / 2} y={shape.y + shape.height / 2 + 4} textAnchor="middle">
               {shape.name}
@@ -98,6 +115,7 @@ export function PlanEditor({ furniture, plan, frontImageUrl, onPlan, onContinue 
   const [showReference, setShowReference] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const isPhotoDerived = Boolean(plan?.source_reconstruction_id);
 
   useEffect(() => {
     setComponents(plan?.components ?? []);
@@ -109,6 +127,7 @@ export function PlanEditor({ furniture, plan, frontImageUrl, onPlan, onContinue 
     setBusy("generate");
     setError(null);
     try {
+      await api.reconstruction.run(furniture.id);
       onPlan(await api.plans.generate(furniture.id));
     } catch (reason) {
       setError((reason as Error).message);
@@ -118,10 +137,26 @@ export function PlanEditor({ furniture, plan, frontImageUrl, onPlan, onContinue 
   }
 
   function edit(id: string, field: EditableField, value: string) {
-    setComponents((items) => items.map((item) => item.id === id ? {
-      ...item,
-      [field]: field === "quantity" ? Number(value) : value,
-    } : item));
+    setComponents((items) => items.map((item) => {
+      if (item.id !== id) return item;
+      let profilePoints = item.profile_points;
+      const nextSize = Number(value);
+      if (profilePoints && Number.isFinite(nextSize) && nextSize > 0) {
+        if (field === "width" && Number(item.width) > 0) {
+          const scale = nextSize / Number(item.width);
+          profilePoints = profilePoints.map((point) => ({ ...point, u: String(Number(point.u) * scale) }));
+        }
+        if (field === "height" && Number(item.height) > 0) {
+          const scale = nextSize / Number(item.height);
+          profilePoints = profilePoints.map((point) => ({ ...point, v: String(Number(point.v) * scale) }));
+        }
+      }
+      return {
+        ...item,
+        profile_points: profilePoints,
+        [field]: field === "quantity" ? Number(value) : value,
+      };
+    }));
     setDirtyIds((items) => new Set(items).add(id));
   }
 
@@ -141,6 +176,11 @@ export function PlanEditor({ furniture, plan, frontImageUrl, onPlan, onContinue 
         y: component.y,
         z: component.z,
         rotation: component.rotation,
+        rotation_x: component.rotation_x,
+        rotation_y: component.rotation_y,
+        rotation_z: component.rotation_z,
+        geometry_kind: component.geometry_kind,
+        profile_points: component.profile_points,
         quantity: component.quantity,
       };
       const saved = await api.plans.updateComponent(plan.id, component.id, payload);
@@ -191,21 +231,23 @@ export function PlanEditor({ furniture, plan, frontImageUrl, onPlan, onContinue 
 
   return (
     <section className="workspace-section workspace-section--wide">
-      <SectionHeading eyebrow="Step 04 · Parametric drawing" title="Review the generated parts">
+      <SectionHeading eyebrow="Step 04 · Parametric drawing" title={isPhotoDerived ? "Review the reconstructed parts" : "Review the plan"}>
         {plan && <span className={`status-badge status-badge--${plan.status}`}>Revision {plan.revision} · {plan.status}</span>}
       </SectionHeading>
       <p className="section-intro">
-        The draft starts from the classified {plan ? furnitureLabel(plan.furniture_type).toLowerCase() : "furniture"} structure. Select one part at a time and compare it with the photographs before locking the revision.
+        {plan && !isPhotoDerived
+          ? "This is a legacy template plan created before photo-derived reconstruction was required. It is not a copy of the photographed design."
+          : `The draft is reconstructed from the uploaded ${plan ? furnitureLabel(plan.furniture_type).toLowerCase() : "furniture"} photographs. Select each detected part and verify its outline, size, and placement before locking the revision.`}
       </p>
       {error && <Notice tone="danger">{error}</Notice>}
 
       {!plan ? (
         <div className="panel plan-empty">
           <EmptyState title="No drawing generated yet">
-            WUE will create a deterministic set of panels and legs from your saved dimensions.
+            WUE must analyze the five photographs and create parts shaped from their visible outlines. It will not substitute a standard furniture template.
           </EmptyState>
           <button className="button button--primary" onClick={generate} disabled={busy === "generate"}>
-            {busy === "generate" ? <BusyLabel>Drawing…</BusyLabel> : "Generate plan"}
+            {busy === "generate" ? <BusyLabel>Analyzing photos…</BusyLabel> : "Analyze photos & build 2D parts"}
           </button>
         </div>
       ) : (
@@ -214,7 +256,7 @@ export function PlanEditor({ furniture, plan, frontImageUrl, onPlan, onContinue 
             <div className="plan-canvas">
               {frontImageUrl && (
                 <div className="plan-canvas__toolbar">
-                  <span>Photo overlay is a visual guide, not a measured trace.</span>
+                  <span>{isPhotoDerived ? "The photo is an AI source view; use the overlay to verify the reconstructed fit." : "Reference overlay only—this legacy plan was not derived from the photo."}</span>
                   <button type="button" onClick={() => setShowReference((visible) => !visible)}>
                     {showReference ? "Hide front photo" : "Show front photo"}
                   </button>
@@ -244,7 +286,7 @@ export function PlanEditor({ furniture, plan, frontImageUrl, onPlan, onContinue 
                     : "Select a part below to edit it. A finalized plan cannot be changed."}
                 </Notice>
               ) : (
-                <Notice tone="success">This revision is locked and ready for reconstruction and costing.</Notice>
+                <Notice tone={isPhotoDerived ? "success" : "warning"}>{isPhotoDerived ? "This photo-derived revision is locked and ready for 3D and costing." : "Legacy template revision. Create a new furniture item to use photo-derived reconstruction."}</Notice>
               )}
             </aside>
           </div>

@@ -30,17 +30,6 @@ class PlanSemanticValidationError(ValueError):
         super().__init__("Plan cannot be finalized: " + "; ".join(self.issues))
 
 
-def _describe_unrecognized(
-    furniture_type: FurnitureType,
-    components: list[ComponentIdentity],
-) -> str:
-    descriptions = ", ".join(
-        f"{component.component_name}:{component.component_type.value}"
-        for component in components
-    )
-    return f"unrecognized {furniture_type.value} components: {descriptions}"
-
-
 def _validate_chair(components: list[ComponentIdentity]) -> tuple[str, ...]:
     legs = [item for item in components if item.component_type == ComponentType.LEG]
     seats = [
@@ -55,8 +44,6 @@ def _validate_chair(components: list[ComponentIdentity]) -> tuple[str, ...]:
         if item.component_name == "backrest"
         and item.component_type == ComponentType.PANEL
     ]
-    recognized_ids = {id(item) for item in (*legs, *seats, *backrests)}
-    unrecognized = [item for item in components if id(item) not in recognized_ids]
     issues: list[str] = []
     if not legs:
         issues.append("chair requires at least one leg")
@@ -69,8 +56,6 @@ def _validate_chair(components: list[ComponentIdentity]) -> tuple[str, ...]:
             "chair requires exactly one backrest panel "
             f"(found {len(backrests)})"
         )
-    if unrecognized:
-        issues.append(_describe_unrecognized(FurnitureType.CHAIR, unrecognized))
     return tuple(issues)
 
 
@@ -84,8 +69,6 @@ def _validate_dining_table(
         if item.component_name == "tabletop"
         and item.component_type == ComponentType.PANEL
     ]
-    recognized_ids = {id(item) for item in (*legs, *tabletops)}
-    unrecognized = [item for item in components if id(item) not in recognized_ids]
     issues: list[str] = []
     if not legs:
         issues.append("dining_table requires at least one leg")
@@ -93,10 +76,6 @@ def _validate_dining_table(
         issues.append(
             "dining_table requires exactly one tabletop panel "
             f"(found {len(tabletops)})"
-        )
-    if unrecognized:
-        issues.append(
-            _describe_unrecognized(FurnitureType.DINING_TABLE, unrecognized)
         )
     return tuple(issues)
 
@@ -117,16 +96,6 @@ def _validate_bookshelf(
         and SHELF_NAME_PATTERN.fullmatch(item.component_name)
     ]
     shelf_counts = Counter(item.component_name for item in shelves)
-    recognized_ids = {
-        id(item)
-        for item in components
-        if item.component_type == ComponentType.PANEL
-        and (
-            item.component_name in BOOKSHELF_REQUIRED_PANELS
-            or SHELF_NAME_PATTERN.fullmatch(item.component_name)
-        )
-    }
-    unrecognized = [item for item in components if id(item) not in recognized_ids]
     issues: list[str] = []
     for name in BOOKSHELF_REQUIRED_PANELS:
         count = required_counts[name]
@@ -144,8 +113,6 @@ def _validate_bookshelf(
             "bookshelf shelf identities must be unique: "
             + ", ".join(duplicate_shelves)
         )
-    if unrecognized:
-        issues.append(_describe_unrecognized(FurnitureType.BOOKSHELF, unrecognized))
     return tuple(issues)
 
 

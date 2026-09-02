@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from app.models.furniture import Furniture
     from app.models.furniture_component import FurnitureComponent
     from app.models.quotation import Quotation
+    from app.models.furniture_reconstruction import FurnitureReconstruction
 
 
 class FurniturePlan(TimestampMixin, Base):
@@ -85,8 +86,17 @@ class FurniturePlan(TimestampMixin, Base):
         ),
         nullable=False,
     )
+    source_reconstruction_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("furniture_reconstructions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     furniture: Mapped["Furniture"] = relationship(back_populates="plans")
+    source_reconstruction: Mapped["FurnitureReconstruction | None"] = relationship(
+        back_populates="plans"
+    )
     components: Mapped[list["FurnitureComponent"]] = relationship(
         back_populates="plan",
         cascade="all, delete-orphan",

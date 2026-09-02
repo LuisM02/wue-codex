@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.enums import PlanStatus
 from app.models.furniture_plan import FurniturePlan
+from tests.support.photo_reconstruction import prepare_test_reconstruction
 
 pytestmark = pytest.mark.integration
 
@@ -63,6 +64,7 @@ def create_furniture(
             },
         )
         assert response.status_code == 201
+        prepare_test_reconstruction(client, furniture_id)
     return furniture_id
 
 
@@ -73,7 +75,7 @@ def generate_plan(client: TestClient, furniture_id: str) -> dict[str, object]:
 
 
 @pytest.mark.parametrize("furniture_type", list(EXPECTED_NAMES))
-def test_generates_defaults_reads_plan_and_locks_dimensions(
+def test_generates_photo_reconstruction_reads_plan_and_locks_dimensions(
     db_client: TestClient,
     furniture_type: str,
 ) -> None:

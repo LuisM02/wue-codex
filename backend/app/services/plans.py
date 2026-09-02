@@ -1,6 +1,5 @@
 """Parametric plan persistence and draft mutation workflow."""
 
-from dataclasses import asdict
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -13,10 +12,12 @@ from app.models.furniture import Furniture
 from app.models.furniture_component import FurnitureComponent
 from app.models.furniture_plan import FurniturePlan
 from app.schemas.plans import ComponentCreate, ComponentUpdate
+from app.services import dimensions as dimension_service
 from app.services._persistence import commit, commit_and_refresh
 from app.services.dimensions import lock_dimensions_for_plan
-from app.services.plan_geometry import generate_default_components
 from app.services.plan_validation import validate_plan_components
+from app.services.reconstruction_state import get_reconstruction
+from app.services.plan_geometry import MIN_PLAN_DIMENSION_MM, PlanGeometryRangeError
 
 
 class DraftPlanExistsError(RuntimeError):
@@ -39,6 +40,10 @@ class FurnitureClassificationRequiredError(RuntimeError):
     """Raised when a plan is requested before furniture type is known."""
 
 
+class PhotoReconstructionRequiredError(RuntimeError):
+    """Raised instead of silently substituting generic furniture geometry."""
+
+
 COMPONENT_COPY_FIELDS = (
     "component_name",
     "component_type",
@@ -50,6 +55,13 @@ COMPONENT_COPY_FIELDS = (
     "y",
     "z",
     "rotation",
+    "rotation_x",
+    "rotation_y",
+    "rotation_z",
+    "geometry_kind",
+    "profile_points",
+    "source_confidence",
+    "source_views",
     "quantity",
     "sort_order",
 )
@@ -89,7 +101,7 @@ def get_draft_plan(
 
 
 def create_initial_plan(session: Session, furniture: Furniture) -> FurniturePlan:
-    """Generate a draft and lock overall dimensions in one transaction."""
+    """Create a draft only from a validated photo-derived reconstruction."""
     if furniture.furniture_type is None:
         raise FurnitureClassificationRequiredError(
             "Furniture classification is required before generating a 2D plan"
@@ -104,9 +116,33 @@ def create_initial_plan(session: Session, furniture: Furniture) -> FurniturePlan
         raise PlanHistoryExistsError(
             "Furniture already has a plan; create a revision from a finalized plan"
         )
+    dimensions = dimension_service.get_dimensions(session, furniture.id)
+    if dimensions is None:
+        raise dimension_service.DimensionsRequiredError(
+            "Overall dimensions are required before generating a 2D plan"
+        )
+    if min(dimensions.width_mm, dimensions.height_mm, dimensions.depth_mm) < MIN_PLAN_DIMENSION_MM:
+        raise PlanGeometryRangeError(
+            "Overall width, height, and depth must each be at least "
+            f"{MIN_PLAN_DIMENSION_MM} millimeter for 2D generation"
+        )
+    reconstruction = get_reconstruction(session, furniture.id)
+    if reconstruction is None:
+        raise PhotoReconstructionRequiredError(
+            "Photo-derived part reconstruction is required before generating a 2D plan; "
+            "WUE will not use a generic furniture template"
+        )
+    if reconstruction.furniture_type != furniture.furniture_type:
+        raise PhotoReconstructionRequiredError(
+            "The saved reconstruction does not match the current furniture type; analyze the photos again"
+        )
+    if not reconstruction.parts:
+        raise PhotoReconstructionRequiredError(
+            "The saved reconstruction contains no detected parts; analyze the photos again"
+        )
 
     try:
-        dimensions = lock_dimensions_for_plan(session, furniture.id)
+        lock_dimensions_for_plan(session, furniture.id)
         latest_revision = session.scalar(
             select(func.max(FurniturePlan.revision)).where(
                 FurniturePlan.furniture_id == furniture.id
@@ -118,18 +154,35 @@ def create_initial_plan(session: Session, furniture: Furniture) -> FurniturePlan
             revision=revision,
             status=PlanStatus.DRAFT,
             furniture_type=furniture.furniture_type,
+            source_reconstruction_id=reconstruction.id,
         )
         session.add(plan)
         session.flush()
-        seeds = generate_default_components(
-            furniture.furniture_type,
-            width_mm=dimensions.width_mm,
-            height_mm=dimensions.height_mm,
-            depth_mm=dimensions.depth_mm,
-        )
         session.add_all(
-            FurnitureComponent(plan_id=plan.id, **asdict(seed))
-            for seed in seeds
+            FurnitureComponent(
+                plan_id=plan.id,
+                source_reconstruction_part_id=part.id,
+                component_name=part.component_name,
+                component_type=part.component_type,
+                width=part.width,
+                height=part.height,
+                depth=part.depth,
+                thickness=None,
+                x=part.x,
+                y=part.y,
+                z=part.z,
+                rotation=part.rotation_y,
+                rotation_x=part.rotation_x,
+                rotation_y=part.rotation_y,
+                rotation_z=part.rotation_z,
+                geometry_kind=part.geometry_kind,
+                profile_points=part.profile_points,
+                source_confidence=part.confidence,
+                source_views=part.source_views,
+                quantity=part.quantity,
+                sort_order=part.sort_order,
+            )
+            for part in reconstruction.parts
         )
         session.commit()
     except IntegrityError as exc:
@@ -188,12 +241,14 @@ def create_revision(session: Session, source: FurniturePlan) -> FurniturePlan:
             revision=revision,
             status=PlanStatus.DRAFT,
             furniture_type=source.furniture_type,
+            source_reconstruction_id=source.source_reconstruction_id,
         )
         session.add(plan)
         session.flush()
         session.add_all(
             FurnitureComponent(
                 plan_id=plan.id,
+                source_reconstruction_part_id=component.source_reconstruction_part_id,
                 **{
                     field: getattr(component, field)
                     for field in COMPONENT_COPY_FIELDS
@@ -251,7 +306,7 @@ def add_component(
     payload: ComponentCreate,
 ) -> FurnitureComponent:
     require_draft(plan)
-    component = FurnitureComponent(plan_id=plan.id, **payload.model_dump())
+    component = FurnitureComponent(plan_id=plan.id, **payload.model_dump(mode="json"))
     session.add(component)
     _touch(plan)
     commit_and_refresh(session, component)
@@ -265,8 +320,18 @@ def update_component(
     payload: ComponentUpdate,
 ) -> FurnitureComponent:
     require_draft(plan)
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(component, field, value)
+    merged = {
+        field: getattr(component, field)
+        for field in ComponentCreate.model_fields
+    }
+    merged.update(payload.model_dump(exclude_unset=True))
+    validated = ComponentCreate.model_validate(merged).model_dump(mode="json")
+    for field in payload.model_fields_set:
+        setattr(component, field, validated[field])
+    if "rotation" in payload.model_fields_set and "rotation_y" not in payload.model_fields_set:
+        component.rotation_y = validated["rotation"]
+    if "rotation_y" in payload.model_fields_set and "rotation" not in payload.model_fields_set:
+        component.rotation = validated["rotation_y"]
     _touch(plan)
     commit_and_refresh(session, component)
     return component

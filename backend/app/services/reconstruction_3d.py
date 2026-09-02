@@ -9,6 +9,7 @@ from app.core.enums import (
     ComponentDepthSource,
     ComponentType,
     FurnitureType,
+    GeometryKind,
     PlanStatus,
 )
 from app.models.furniture_plan import FurniturePlan
@@ -43,6 +44,11 @@ class GeometryComponent(Protocol):
     y: Decimal
     z: Decimal
     rotation: Decimal
+    rotation_x: Decimal
+    rotation_y: Decimal
+    rotation_z: Decimal
+    geometry_kind: GeometryKind
+    profile_points: list[dict[str, str]] | None
     quantity: int
     sort_order: int
 
@@ -62,6 +68,12 @@ class BoxDimensions3D:
 
 
 @dataclass(frozen=True, slots=True)
+class ProfilePoint2D:
+    u: Decimal
+    v: Decimal
+
+
+@dataclass(frozen=True, slots=True)
 class ComponentGeometry3D:
     source_component_id: UUID
     component_name: str
@@ -71,6 +83,9 @@ class ComponentGeometry3D:
     center: Vector3D
     depth_source: ComponentDepthSource
     rotation_degrees: Decimal
+    rotation: Vector3D
+    geometry_kind: GeometryKind
+    profile_points: tuple[ProfilePoint2D, ...] | None
     quantity: int
     sort_order: int
 
@@ -120,6 +135,18 @@ def build_component_geometry(
         ),
         depth_source=depth_source,
         rotation_degrees=component.rotation,
+        rotation=Vector3D(
+            x=getattr(component, "rotation_x", Decimal("0")),
+            y=getattr(component, "rotation_y", component.rotation),
+            z=getattr(component, "rotation_z", Decimal("0")),
+        ),
+        geometry_kind=getattr(component, "geometry_kind", GeometryKind.BOX),
+        profile_points=None
+        if getattr(component, "profile_points", None) is None
+        else tuple(
+            ProfilePoint2D(u=Decimal(point["u"]), v=Decimal(point["v"]))
+            for point in component.profile_points or []
+        ),
         quantity=component.quantity,
         sort_order=component.sort_order,
     )

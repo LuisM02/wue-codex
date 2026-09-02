@@ -48,7 +48,7 @@ def test_chair_accepts_any_leg_identity_but_exact_seat_and_backrest() -> None:
     )
 
 
-def test_chair_reports_cardinality_and_unrecognized_panels() -> None:
+def test_chair_reports_required_cardinality_while_allowing_detected_extra_parts() -> None:
     components = [
         panel("seat"),
         panel("seat"),
@@ -63,7 +63,6 @@ def test_chair_reports_cardinality_and_unrecognized_panels() -> None:
         "chair requires at least one leg",
         "chair requires exactly one seat panel (found 2)",
         "chair requires exactly one backrest panel (found 0)",
-        "unrecognized chair components: Backrest:panel, armrest:panel",
     )
 
 
@@ -78,7 +77,6 @@ def test_dining_table_requires_legs_and_exactly_one_tabletop() -> None:
     assert exc_info.value.issues == (
         "dining_table requires at least one leg",
         "dining_table requires exactly one tabletop panel (found 2)",
-        "unrecognized dining_table components: apron:panel",
     )
 
 
@@ -113,7 +111,6 @@ def test_bookshelf_rejects_invalid_shelf_identifiers(shelf_name: str) -> None:
 
     assert exc_info.value.issues == (
         "bookshelf requires at least one valid shelf_N panel",
-        f"unrecognized bookshelf components: {shelf_name}:panel",
     )
 
 
@@ -133,7 +130,6 @@ def test_bookshelf_rejects_duplicate_required_and_shelf_identities() -> None:
     assert exc_info.value.issues == (
         "bookshelf requires exactly one left_side panel (found 2)",
         "bookshelf shelf identities must be unique: shelf_2",
-        "unrecognized bookshelf components: support:leg",
     )
 
 

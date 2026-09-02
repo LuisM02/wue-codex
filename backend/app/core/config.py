@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "WUE API"
-    app_version: str = "0.17.0"
+    app_version: str = "0.18.0"
     environment: Literal["development", "test", "production"] = "development"
     api_v1_prefix: str = "/api/v1"
     database_url: str = (
@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     upload_directory: Path = Path("uploads")
     max_image_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
     max_image_pixels: int = Field(default=40_000_000, gt=0)
+    reconstruction_provider: Literal["unconfigured", "http"] = "unconfigured"
+    reconstruction_service_url: str = "http://127.0.0.1:8010"
+    reconstruction_timeout_seconds: float = Field(default=600, gt=0, le=3600)
 
     @field_validator("api_v1_prefix")
     @classmethod

@@ -331,6 +331,7 @@ h1, h2, h3, strong, .button { font-family: "Manrope", "DM Sans", sans-serif; }
 .part-measure-text { fill: #fff0cd; font: 700 9px "DM Sans", sans-serif; paint-order: stroke; stroke: #2f4538; stroke-width: 3px; }
 .part-preview-caption { fill: #b7c5ba; font: 9px "DM Sans", sans-serif; }
 .part-editor-form { display: grid; gap: 14px; margin-top: 18px; }
+.part-source-note { padding: 0.8rem 0.95rem; border: 1px solid rgba(117, 86, 57, 0.2); border-radius: 0.65rem; background: rgba(244, 208, 138, 0.16); color: var(--ink-soft); font-size: 0.82rem; text-transform: capitalize; }
 .part-identity { display: grid; grid-template-columns: 1fr 180px; gap: 12px; }
 .part-control-group { display: grid; gap: 4px; padding: 15px; border: 1px solid var(--line); border-radius: 10px; background: #faf8f3; }
 .part-control-group__title { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }

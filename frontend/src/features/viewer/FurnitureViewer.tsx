@@ -1,7 +1,7 @@
 import { Bounds, ContactShadows, Edges, OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { Suspense, useEffect, useState } from "react";
-import { Color } from "three";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { Color, ExtrudeGeometry, Shape } from "three";
 
 import { BusyLabel, Notice, SectionHeading } from "../../components/Feedback";
 import { formatNumber, furnitureLabel } from "../../lib/format";
@@ -30,17 +30,35 @@ function Part({
 }) {
   const dimensions = [Number(part.dimensions.width), Number(part.dimensions.height), Number(part.dimensions.depth)] as [number, number, number];
   const center = [Number(part.center.x), Number(part.center.y), Number(part.center.z)] as [number, number, number];
+  const minCorner = [Number(part.min_corner.x), Number(part.min_corner.y), Number(part.min_corner.z)] as [number, number, number];
+  const profileGeometry = useMemo(() => {
+    if (part.geometry_kind !== "extruded_profile" || !part.profile_points?.length) return null;
+    const shape = new Shape();
+    shape.moveTo(Number(part.profile_points[0].u), Number(part.profile_points[0].v));
+    part.profile_points.slice(1).forEach((point) => shape.lineTo(Number(point.u), Number(point.v)));
+    shape.closePath();
+    return new ExtrudeGeometry(shape, {
+      depth: Number(part.dimensions.depth),
+      bevelEnabled: false,
+      curveSegments: 8,
+    });
+  }, [part.dimensions.depth, part.geometry_kind, part.profile_points]);
   const surface = new Color(color);
   if (part.component_type === "leg") surface.multiplyScalar(0.82);
   return (
     <mesh
-      position={center}
-      rotation={[0, Number(part.rotation_degrees) * Math.PI / 180, 0]}
+      position={profileGeometry ? minCorner : center}
+      rotation={[
+        Number(part.rotation.x) * Math.PI / 180,
+        Number(part.rotation.y) * Math.PI / 180,
+        Number(part.rotation.z) * Math.PI / 180,
+      ]}
+      geometry={profileGeometry ?? undefined}
       onClick={(event) => { event.stopPropagation(); onSelect(); }}
       castShadow
       receiveShadow
     >
-      <boxGeometry args={dimensions} />
+      {!profileGeometry && <boxGeometry args={dimensions} />}
       <meshStandardMaterial color={surface} roughness={0.72} metalness={0.02} />
       <Edges color={selected ? "#f4d08a" : "#432d20"} threshold={15} lineWidth={selected ? 2 : 0.65} />
     </mesh>
@@ -105,7 +123,7 @@ export function FurnitureViewer({ furniture, plan, onContinue }: Props) {
         <span className="status-badge status-badge--finalized">Revision {plan.revision} · locked</span>
       </SectionHeading>
       <p className="section-intro">
-        Drag to orbit, scroll to zoom, and select a part for its exact dimensions. Every box comes directly from the finalized plan.
+        Drag to orbit, scroll to zoom, and select a part for its dimensions. Traced profiles are extruded from the approved 2D outlines; bounded parts remain boxes until their outline is confirmed.
       </p>
       {error && <Notice tone="danger">{error}</Notice>}
 

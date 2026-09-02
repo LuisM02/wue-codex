@@ -16,6 +16,7 @@ from app.services import plans as plan_service
 from app.services.dimensions import get_dimensions, set_dimensions
 from app.services.furniture import create_furniture
 from app.services.projects import create_project
+from tests.support.photo_reconstruction import seed_test_reconstruction
 
 pytestmark = pytest.mark.integration
 
@@ -69,7 +70,7 @@ def test_postgresql_rejects_invalid_plan_state(
 
 def create_plan_record(session: Session):
     furniture = create_furniture_record(session)
-    set_dimensions(
+    dimensions, _ = set_dimensions(
         session,
         furniture,
         FurnitureDimensionsWrite(
@@ -79,6 +80,7 @@ def create_plan_record(session: Session):
             unit="mm",
         ),
     )
+    seed_test_reconstruction(session, furniture, dimensions)
     return plan_service.create_initial_plan(session, furniture)
 
 
@@ -163,7 +165,7 @@ def test_generation_failure_rolls_back_the_dimension_lock(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     furniture = create_furniture_record(db_session)
-    set_dimensions(
+    dimensions, _ = set_dimensions(
         db_session,
         furniture,
         FurnitureDimensionsWrite(
@@ -173,11 +175,15 @@ def test_generation_failure_rolls_back_the_dimension_lock(
             unit="mm",
         ),
     )
+    seed_test_reconstruction(db_session, furniture, dimensions)
 
-    def fail_geometry(*args: object, **kwargs: object) -> None:
+    real_lock = plan_service.lock_dimensions_for_plan
+
+    def fail_after_lock(*args: object, **kwargs: object) -> None:
+        real_lock(*args, **kwargs)
         raise RuntimeError("synthetic geometry failure")
 
-    monkeypatch.setattr(plan_service, "generate_default_components", fail_geometry)
+    monkeypatch.setattr(plan_service, "lock_dimensions_for_plan", fail_after_lock)
 
     with pytest.raises(RuntimeError, match="synthetic geometry failure"):
         plan_service.create_initial_plan(db_session, furniture)

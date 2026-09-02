@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.core.enums import ComponentDepthSource, ComponentType, FurnitureType, PlanStatus
+from app.core.enums import ComponentDepthSource, ComponentType, FurnitureType, GeometryKind, PlanStatus
 from app.services.reconstruction_3d import (
     ComponentDepthRequiredError,
     PlanNotFinalizedError,
@@ -28,6 +28,11 @@ class Component:
     y: Decimal = Decimal("5.0000")
     z: Decimal = Decimal("-5.0000")
     rotation: Decimal = Decimal("45.5000")
+    rotation_x: Decimal = Decimal("0")
+    rotation_y: Decimal = Decimal("45.5000")
+    rotation_z: Decimal = Decimal("0")
+    geometry_kind: GeometryKind = GeometryKind.BOX
+    profile_points: list[dict[str, str]] | None = None
     quantity: int = 3
     sort_order: int = 7
 
@@ -76,6 +81,9 @@ def test_maps_dimensions_and_min_corner_to_exact_box_center() -> None:
     assert result.center.z == Decimal("0.50005")
     assert result.depth_source == ComponentDepthSource.COMPONENT_DEPTH
     assert result.rotation_degrees == Decimal("45.5000")
+    assert result.rotation.y == Decimal("45.5000")
+    assert result.geometry_kind == GeometryKind.BOX
+    assert result.profile_points is None
     assert result.quantity == 3
     assert result.sort_order == 7
 

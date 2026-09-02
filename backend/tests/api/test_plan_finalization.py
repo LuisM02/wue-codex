@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from tests.support.photo_reconstruction import prepare_test_reconstruction
 
 pytestmark = pytest.mark.integration
 
@@ -35,6 +36,7 @@ def create_draft(client: TestClient, furniture_type: str = "chair") -> dict:
         json={"width": 1000, "height": 1200, "depth": 600, "unit": "mm"},
     )
     assert dimensions.status_code == 201
+    prepare_test_reconstruction(client, furniture_id)
     response = client.post(f"/api/v1/furniture/{furniture_id}/plans")
     assert response.status_code == 201
     return response.json()
@@ -95,7 +97,7 @@ def test_invalid_semantics_leave_draft_editable_until_repaired(
     assert repaired.json()["status"] == "finalized"
 
 
-def test_unrecognized_component_blocks_finalization(db_client: TestClient) -> None:
+def test_photo_detected_extra_component_is_preserved_at_finalization(db_client: TestClient) -> None:
     draft = create_draft(db_client, "dining_table")
     plan_url = f"/api/v1/plans/{draft['id']}"
     added = db_client.post(
@@ -112,13 +114,11 @@ def test_unrecognized_component_blocks_finalization(db_client: TestClient) -> No
 
     response = db_client.post(f"{plan_url}/finalize")
 
-    assert response.status_code == 409
-    assert response.json() == {
-        "detail": (
-            "Plan cannot be finalized: unrecognized dining_table "
-            "components: apron:panel"
-        )
-    }
+    assert response.status_code == 200
+    assert any(
+        item["component_name"] == "apron"
+        for item in response.json()["components"]
+    )
 
 
 def test_revision_deep_copies_finalized_geometry_into_next_draft(

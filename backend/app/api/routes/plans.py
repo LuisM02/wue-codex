@@ -59,6 +59,8 @@ def generate_plan(
         return plan_service.create_initial_plan(session, furniture)
     except plan_service.FurnitureClassificationRequiredError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except plan_service.PhotoReconstructionRequiredError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except dimension_service.DimensionsRequiredError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except plan_service.DraftPlanExistsError as exc:

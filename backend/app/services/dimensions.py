@@ -14,6 +14,7 @@ from app.models.furniture import Furniture
 from app.models.furniture_dimensions import FurnitureDimensions
 from app.schemas.dimensions import FurnitureDimensionsWrite
 from app.services._persistence import commit, commit_and_refresh
+from app.services.reconstruction_state import invalidate_reconstruction
 
 CANONICAL_QUANTUM_MM = Decimal("0.0001")
 MAX_CANONICAL_MM = Decimal("9999999999.9999")
@@ -112,6 +113,7 @@ def set_dimensions(
         )
 
     canonical = canonicalize(payload)
+    invalidate_reconstruction(session, furniture.id)
     if dimensions is None:
         dimensions = FurnitureDimensions(furniture_id=furniture.id)
         session.add(dimensions)
@@ -129,6 +131,7 @@ def delete_dimensions(session: Session, dimensions: FurnitureDimensions) -> None
         raise DimensionsLockedError(
             "Overall dimensions are locked because a 2D plan has been generated"
         )
+    invalidate_reconstruction(session, dimensions.furniture_id)
     session.delete(dimensions)
     commit(session)
 

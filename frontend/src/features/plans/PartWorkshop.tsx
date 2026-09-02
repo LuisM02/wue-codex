@@ -15,6 +15,9 @@ export type EditableField =
   | "y"
   | "z"
   | "rotation"
+  | "rotation_x"
+  | "rotation_y"
+  | "rotation_z"
   | "quantity";
 
 interface Props {
@@ -55,6 +58,9 @@ function FrontPreview({ components, selected, bounds }: { components: PlanCompon
     y: 310 - (Number(part.y) - bounds.minY + Number(part.height)) * scale,
     width: Math.max(Number(part.width) * scale, 2),
     height: Math.max(Number(part.height) * scale, 2),
+    polygon: part.profile_points?.map((point) =>
+      `${55 + (Number(part.x) - bounds.minX + Number(point.u)) * scale},${310 - (Number(part.y) - bounds.minY + Number(point.v)) * scale}`
+    ).join(" ") ?? null,
   });
   const active = transform(selected);
 
@@ -73,9 +79,13 @@ function FrontPreview({ components, selected, bounds }: { components: PlanCompon
       <line x1="28" y1="312" x2="492" y2="312" className="part-preview-ground" />
       {components.filter((part) => part.id !== selected.id).map((part) => {
         const shape = transform(part);
-        return <rect key={part.id} {...shape} className="part-preview-ghost" />;
+        return part.geometry_kind === "extruded_profile" && shape.polygon
+          ? <polygon key={part.id} points={shape.polygon} className="part-preview-ghost" />
+          : <rect key={part.id} x={shape.x} y={shape.y} width={shape.width} height={shape.height} className="part-preview-ghost" />;
       })}
-      <rect {...active} className={`part-preview-active part-preview-active--${selected.component_type}`} />
+      {selected.geometry_kind === "extruded_profile" && active.polygon
+        ? <polygon points={active.polygon} className={`part-preview-active part-preview-active--${selected.component_type}`} />
+        : <rect x={active.x} y={active.y} width={active.width} height={active.height} className={`part-preview-active part-preview-active--${selected.component_type}`} />}
       <line x1={active.x} y1={Math.max(42, active.y - 18)} x2={active.x + active.width} y2={Math.max(42, active.y - 18)} className="part-measure-line" markerStart="url(#arrow-front)" markerEnd="url(#arrow-front)" />
       <text x={active.x + active.width / 2} y={Math.max(36, active.y - 24)} textAnchor="middle" className="part-measure-text">{formatNumber(selected.width, 1)} mm</text>
       <line x1={Math.max(18, active.x - 18)} y1={active.y} x2={Math.max(18, active.x - 18)} y2={active.y + active.height} className="part-measure-line" markerStart="url(#arrow-front)" markerEnd="url(#arrow-front)" />
@@ -182,7 +192,7 @@ export function PartWorkshop({ components, selectedId, disabled, busy, dirtyIds,
           {components.map((part, index) => (
             <button key={part.id} type="button" className={`${part.id === selected.id ? "is-selected" : ""}${dirtyIds.has(part.id) ? " is-dirty" : ""}`} onClick={() => onSelect(part.id)}>
               <span>{String(index + 1).padStart(2, "0")}</span>
-              <div><strong>{part.component_name.replaceAll("_", " ")}</strong><small>{part.component_type} · {formatNumber(part.width, 0)} × {formatNumber(part.height, 0)} mm{dirtyIds.has(part.id) ? " · unsaved" : ""}</small></div>
+              <div><strong>{part.component_name.replaceAll("_", " ")}</strong><small>{part.geometry_kind === "extruded_profile" ? "traced outline" : part.component_type} · {formatNumber(part.width, 0)} × {formatNumber(part.height, 0)} mm{part.source_confidence ? ` · ${Math.round(Number(part.source_confidence) * 100)}% AI confidence` : ""}{dirtyIds.has(part.id) ? " · unsaved" : ""}</small></div>
             </button>
           ))}
         </nav>
@@ -194,6 +204,7 @@ export function PartWorkshop({ components, selectedId, disabled, busy, dirtyIds,
           </div>
 
           <div className="part-editor-form">
+            {selected.source_views.length > 0 && <div className="part-source-note"><strong>Detected from:</strong> {selected.source_views.join(", ").replaceAll("_", " ")}{selected.geometry_kind === "extruded_profile" ? " · editable traced outline" : " · bounded part"}</div>}
             <div className="part-identity">
               <label className="field"><span>Part name</span><input disabled={disabled} value={selected.component_name} onChange={(event) => onChange(selected.id, "component_name", event.target.value)} /></label>
               <label className="field"><span>Part type</span><select disabled={disabled} value={selected.component_type} onChange={(event) => onChange(selected.id, "component_type", event.target.value)}><option value="panel">Panel</option><option value="leg">Leg</option></select></label>
@@ -211,7 +222,9 @@ export function PartWorkshop({ components, selectedId, disabled, busy, dirtyIds,
               <NumberControl label="Z position" hint="Front / back" value={selected.z} field="z" selected={selected} disabled={disabled} min={-maxDepth} max={maxDepth * 2} onChange={onChange} />
             </div>
             <div className="part-compact-controls">
-              <label className="field"><span>Rotation</span><div className="input-unit"><input disabled={disabled} type="number" step="any" value={selected.rotation} onChange={(event) => onChange(selected.id, "rotation", event.target.value)} /><b>deg</b></div></label>
+              <label className="field"><span>Tilt X</span><div className="input-unit"><input disabled={disabled} type="number" step="any" value={selected.rotation_x} onChange={(event) => onChange(selected.id, "rotation_x", event.target.value)} /><b>deg</b></div></label>
+              <label className="field"><span>Turn Y</span><div className="input-unit"><input disabled={disabled} type="number" step="any" value={selected.rotation_y} onChange={(event) => onChange(selected.id, "rotation_y", event.target.value)} /><b>deg</b></div></label>
+              <label className="field"><span>Tilt Z</span><div className="input-unit"><input disabled={disabled} type="number" step="any" value={selected.rotation_z} onChange={(event) => onChange(selected.id, "rotation_z", event.target.value)} /><b>deg</b></div></label>
               <label className="field"><span>Quantity</span><input disabled={disabled} type="number" min="1" step="1" value={selected.quantity} onChange={(event) => onChange(selected.id, "quantity", event.target.value)} /></label>
             </div>
             {!disabled && (

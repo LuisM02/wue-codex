@@ -58,6 +58,13 @@ class ComponentType(str, Enum):
     LEG = "leg"
 
 
+class GeometryKind(str, Enum):
+    """Editable geometry representations accepted from reconstruction AI."""
+
+    BOX = "box"
+    EXTRUDED_PROFILE = "extruded_profile"
+
+
 class ComponentDepthSource(str, Enum):
     """Which finalized field supplied a reconstructed component's Z extent."""
 

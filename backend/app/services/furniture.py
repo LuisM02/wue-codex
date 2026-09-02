@@ -9,6 +9,7 @@ from app.models.furniture import Furniture
 from app.models.project import Project
 from app.schemas.furniture import FurnitureCreate, FurnitureUpdate
 from app.services.classification_state import invalidate_classification
+from app.services.reconstruction_state import invalidate_reconstruction
 from app.services import furniture_images as image_service
 from app.services._persistence import commit, commit_and_refresh
 from app.services.image_storage import ImageStorage
@@ -55,6 +56,7 @@ def update_furniture(
     requested_type = updates.get("furniture_type")
     if requested_type is not None and requested_type != furniture.furniture_type:
         invalidate_classification(session, furniture.id)
+        invalidate_reconstruction(session, furniture.id)
     for field, value in updates.items():
         setattr(furniture, field, value)
     commit_and_refresh(session, furniture)

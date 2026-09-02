@@ -1,5 +1,5 @@
 import type {
-  CompleteCost, CostSelection, Furniture, FurnitureClassification, FurnitureDimensions,
+  CompleteCost, CostSelection, Furniture, FurnitureClassification, FurnitureDimensions, FurnitureReconstruction,
   FurnitureImage, FurniturePlan, FurnitureType, HardwareQuantity, ImageView, LaborQuantity,
   LaborRate, Material, MaterialQuantity, PlanComponent, PlanGeometry, Project, Quotation, UUID,
 } from "../types/api";
@@ -80,6 +80,10 @@ export const api = {
     get: (furnitureId: UUID) => request<FurnitureDimensions>(`/furniture/${furnitureId}/dimensions`),
     save: (furnitureId: UUID, payload: { width: number; height: number; depth: number; unit: string; source: "manual" }) =>
       request<FurnitureDimensions>(`/furniture/${furnitureId}/dimensions`, { method: "PUT", body: JSON.stringify(payload) }),
+  },
+  reconstruction: {
+    get: (furnitureId: UUID) => request<FurnitureReconstruction>(`/furniture/${furnitureId}/reconstruction`),
+    run: (furnitureId: UUID) => request<FurnitureReconstruction>(`/furniture/${furnitureId}/reconstruction`, { method: "POST" }),
   },
   plans: {
     list: (furnitureId: UUID) => request<FurniturePlan[]>(`/furniture/${furnitureId}/plans`),

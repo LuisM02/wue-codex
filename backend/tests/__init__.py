@@ -1,1 +1,1 @@
-"""WUE backend test package."""
+"""WUE test support package."""

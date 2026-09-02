@@ -14,6 +14,7 @@ from app.api.routes.labor_rates import rates_router as labor_rates_router
 from app.api.routes.material_cost import router as material_cost_router
 from app.api.routes.materials import materials_router, prices_router
 from app.api.routes.plans import furniture_plans_router, plans_router
+from app.api.routes.photo_reconstruction import router as photo_reconstruction_router
 from app.api.routes.projects import router as projects_router
 from app.api.routes.quotations import plans_router as quotation_plans_router
 from app.api.routes.quotations import quotations_router
@@ -25,6 +26,7 @@ api_router.include_router(project_furniture_router)
 api_router.include_router(furniture_images_router)
 api_router.include_router(classification_router)
 api_router.include_router(dimensions_router)
+api_router.include_router(photo_reconstruction_router)
 api_router.include_router(materials_router)
 api_router.include_router(prices_router)
 api_router.include_router(labor_rates_router)

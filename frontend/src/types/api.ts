@@ -4,6 +4,7 @@ export type FurnitureType = "chair" | "dining_table" | "bookshelf";
 export type ImageView = "front" | "back" | "left" | "right" | "top";
 export type DimensionUnit = "mm" | "cm" | "m" | "in";
 export type ComponentType = "panel" | "leg";
+export type GeometryKind = "box" | "extruded_profile";
 export type PlanStatus = "draft" | "finalized";
 export type MaterialType = "wood" | "hardware";
 export type MaterialUnit = "mm3" | "cm3" | "m3" | "board_ft" | "piece";
@@ -79,6 +80,14 @@ export interface PlanComponent {
   y: DecimalString;
   z: DecimalString;
   rotation: DecimalString;
+  rotation_x: DecimalString;
+  rotation_y: DecimalString;
+  rotation_z: DecimalString;
+  geometry_kind: GeometryKind;
+  profile_points: Array<{ u: DecimalString; v: DecimalString }> | null;
+  source_reconstruction_part_id: UUID | null;
+  source_confidence: DecimalString | null;
+  source_views: ImageView[];
   quantity: number;
   sort_order: number;
   created_at: string;
@@ -91,6 +100,7 @@ export interface FurniturePlan {
   revision: number;
   status: PlanStatus;
   furniture_type: FurnitureType;
+  source_reconstruction_id: UUID | null;
   components: PlanComponent[];
   created_at: string;
   updated_at: string;
@@ -111,8 +121,49 @@ export interface GeometryComponent {
   center: Vector3D;
   depth_source: "component_depth" | "thickness";
   rotation_degrees: DecimalString;
+  rotation: Vector3D;
+  geometry_kind: GeometryKind;
+  profile_points: Array<{ u: DecimalString; v: DecimalString }> | null;
   quantity: number;
   sort_order: number;
+}
+
+export interface ReconstructionPart {
+  id: UUID;
+  reconstruction_id: UUID;
+  component_name: string;
+  component_type: ComponentType;
+  geometry_kind: GeometryKind;
+  profile_points: Array<{ u: DecimalString; v: DecimalString }> | null;
+  width: DecimalString;
+  height: DecimalString;
+  depth: DecimalString;
+  x: DecimalString;
+  y: DecimalString;
+  z: DecimalString;
+  rotation_x: DecimalString;
+  rotation_y: DecimalString;
+  rotation_z: DecimalString;
+  quantity: number;
+  sort_order: number;
+  confidence: DecimalString | null;
+  source_views: ImageView[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FurnitureReconstruction {
+  id: UUID;
+  furniture_id: UUID;
+  input_signature: string;
+  furniture_type: FurnitureType;
+  provider_name: string;
+  provider_version: string | null;
+  confidence: DecimalString | null;
+  warnings: string[];
+  parts: ReconstructionPart[];
+  created_at: string;
+  updated_at: string;
 }
 
 export interface PlanGeometry {

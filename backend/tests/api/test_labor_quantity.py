@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from tests.support.photo_reconstruction import prepare_test_reconstruction
 
 pytestmark = pytest.mark.integration
 
@@ -24,6 +25,7 @@ def create_draft(client: TestClient, furniture_type: str) -> dict:
         json={"width": 1000, "height": 1200, "depth": 600, "unit": "mm"},
     )
     assert dimensions.status_code == 201
+    prepare_test_reconstruction(client, furniture_id)
     response = client.post(f"/api/v1/furniture/{furniture_id}/plans")
     assert response.status_code == 201
     return response.json()
