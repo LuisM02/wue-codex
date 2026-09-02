@@ -28,7 +28,7 @@ export const workflowSteps: Array<{ id: WorkflowStepId; number: string; label: s
 export function completedSteps(context: WorkflowContext): Set<WorkflowStepId> {
   const completed = new Set<WorkflowStepId>();
   if (context.project && context.furniture) completed.add("project");
-  if (context.images.length === 5) completed.add("photos");
+  if (context.images.length === 5 && context.furniture?.furniture_type) completed.add("photos");
   if (context.dimensions) completed.add("dimensions");
   if (context.plan?.status === "finalized") {
     completed.add("plan");
@@ -41,7 +41,7 @@ export function canOpenStep(step: WorkflowStepId, context: WorkflowContext): boo
   if (step === "project") return true;
   if (!context.project || !context.furniture) return false;
   if (step === "photos") return true;
-  if (step === "dimensions") return context.images.length === 5;
+  if (step === "dimensions") return context.images.length === 5 && Boolean(context.furniture.furniture_type);
   if (step === "plan") return Boolean(context.dimensions);
   return context.plan?.status === "finalized";
 }

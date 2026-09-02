@@ -20,7 +20,7 @@ export interface Furniture {
   id: UUID;
   project_id: UUID;
   name: string;
-  furniture_type: FurnitureType;
+  furniture_type: FurnitureType | null;
   created_at: string;
   updated_at: string;
 }

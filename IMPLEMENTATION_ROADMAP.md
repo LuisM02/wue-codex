@@ -2,7 +2,7 @@
 
 Work proceeds in small, tested modules. Each module receives focused service tests, API tests where relevant, a full regression run, and a clean commit before the next module begins.
 
-Current status: Modules 1 through 16 complete.
+Current status: Modules 1 through 17 complete.
 
 1. **Backend foundation (complete)** — FastAPI application factory, environment settings, PostgreSQL/SQLAlchemy session architecture, health endpoints, pytest setup, and project documentation.
 2. **Projects and furniture (complete)** — UUID-backed project and furniture models plus CRUD APIs constrained to chair, dining table, and bookshelf.
@@ -20,4 +20,6 @@ Current status: Modules 1 through 16 complete.
 14. **Labor rates and costing (complete)** — separate admin-maintained hourly rates, dated history, and `Decimal` labor costs.
 15. **Quotation and admin APIs (complete)** — exact material, hardware, and labor totals without overhead plus immutable historical snapshots.
 16. **Frontend workflow (complete)** — responsive React/TypeScript feature modules for projects, five-view images, dimensions, editable 2D plans, lazy-loaded Three.js/R3F viewing, estimates, and immutable quotations.
-17. **End-to-end hardening** — real PostgreSQL integration coverage, frontend/backend contract tests, accessibility, error-state polish, and complete regression verification.
+17. **Photo-first workflow and guided part editing (complete)** — furniture starts unclassified, plan generation waits for recognition, source-image changes invalidate derived identity, and the 2D workspace guides users through one highlighted part at a time with live size and position previews plus an optional photo overlay.
+18. **Vision reconstruction provider** — validate angle and same-object consistency, recognize the supported furniture class, infer an editable component proposal from the photographs, and retain explicit confidence and user-correction provenance.
+19. **End-to-end hardening** — real PostgreSQL integration coverage, frontend/backend contract tests, accessibility, error-state polish, and complete regression verification.

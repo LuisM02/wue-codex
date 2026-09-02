@@ -162,7 +162,7 @@ export function FurnitureViewer({ furniture, plan, onContinue }: Props) {
             <small>Model facts</small>
             <strong>{furniture.name}</strong>
             <dl>
-              <div><dt>Type</dt><dd>{furnitureLabel(furniture.furniture_type)}</dd></div>
+              <div><dt>Type</dt><dd>{furniture.furniture_type ? furnitureLabel(furniture.furniture_type) : furnitureLabel(plan.furniture_type)}</dd></div>
               <div><dt>Definitions</dt><dd>{geometry?.components.length ?? "—"}</dd></div>
               <div><dt>Total pieces</dt><dd>{geometry?.components.reduce((sum, part) => sum + part.quantity, 0) ?? "—"}</dd></div>
               <div><dt>Unit</dt><dd>Millimeter</dd></div>

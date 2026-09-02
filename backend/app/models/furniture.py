@@ -37,7 +37,7 @@ class Furniture(TimestampMixin, Base):
         index=True,
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    furniture_type: Mapped[FurnitureType] = mapped_column(
+    furniture_type: Mapped[FurnitureType | None] = mapped_column(
         SAEnum(
             FurnitureType,
             name="furniture_type_values",
@@ -47,7 +47,7 @@ class Furniture(TimestampMixin, Base):
             length=32,
             values_callable=lambda enum: [member.value for member in enum],
         ),
-        nullable=False,
+        nullable=True,
         index=True,
     )
 

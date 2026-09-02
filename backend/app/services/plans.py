@@ -35,6 +35,10 @@ class PlanHistoryExistsError(RuntimeError):
     """Raised when initial generation is attempted after revision one."""
 
 
+class FurnitureClassificationRequiredError(RuntimeError):
+    """Raised when a plan is requested before furniture type is known."""
+
+
 COMPONENT_COPY_FIELDS = (
     "component_name",
     "component_type",
@@ -86,6 +90,10 @@ def get_draft_plan(
 
 def create_initial_plan(session: Session, furniture: Furniture) -> FurniturePlan:
     """Generate a draft and lock overall dimensions in one transaction."""
+    if furniture.furniture_type is None:
+        raise FurnitureClassificationRequiredError(
+            "Furniture classification is required before generating a 2D plan"
+        )
     if get_draft_plan(session, furniture.id) is not None:
         raise DraftPlanExistsError("Furniture already has an editable draft plan")
     if session.scalar(

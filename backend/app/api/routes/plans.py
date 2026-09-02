@@ -57,6 +57,8 @@ def generate_plan(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Furniture not found")
     try:
         return plan_service.create_initial_plan(session, furniture)
+    except plan_service.FurnitureClassificationRequiredError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except dimension_service.DimensionsRequiredError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except plan_service.DraftPlanExistsError as exc:

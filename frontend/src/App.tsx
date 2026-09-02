@@ -127,8 +127,8 @@ export default function App() {
         </div>
         {furniture && (
           <div className="topbar__piece">
-            <span className={`furniture-glyph furniture-glyph--${furniture.furniture_type}`} aria-hidden="true" />
-            <div><small>Type</small><strong>{furnitureLabel(furniture.furniture_type)}</strong></div>
+            {furniture.furniture_type ? <span className={`furniture-glyph furniture-glyph--${furniture.furniture_type}`} aria-hidden="true" /> : <span className="pending-glyph" aria-hidden="true">?</span>}
+            <div><small>Type</small><strong>{furniture.furniture_type ? furnitureLabel(furniture.furniture_type) : "Awaiting AI"}</strong></div>
           </div>
         )}
       </header>
@@ -164,10 +164,11 @@ export default function App() {
             classification={classification}
             onImages={setImages}
             onClassification={setClassification}
+            onFurniture={setFurniture}
             onContinue={() => visit("dimensions")}
           />
         )}
-        {step === "dimensions" && furniture && (
+        {step === "dimensions" && furniture && furniture.furniture_type && (
           <DimensionsForm
             furniture={furniture}
             dimensions={dimensions}
@@ -179,6 +180,7 @@ export default function App() {
           <PlanEditor
             furniture={furniture}
             plan={plan}
+            frontImageUrl={images.some((image) => image.view === "front") ? api.images.contentUrl(furniture.id, "front") : undefined}
             onPlan={setPlan}
             onContinue={() => visit("model")}
           />

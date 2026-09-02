@@ -3,9 +3,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { BusyLabel, EmptyState, Notice, SectionHeading } from "../../components/Feedback";
 import { furnitureLabel } from "../../lib/format";
 import { api } from "../../services/apiClient";
-import type { Furniture, FurnitureType, Project } from "../../types/api";
-
-const furnitureTypes: FurnitureType[] = ["chair", "dining_table", "bookshelf"];
+import type { Furniture, Project } from "../../types/api";
 
 interface Props {
   projects: Project[];
@@ -30,7 +28,6 @@ export function ProjectSetup({
   const [projectName, setProjectName] = useState("");
   const [description, setDescription] = useState("");
   const [pieceName, setPieceName] = useState("");
-  const [pieceType, setPieceType] = useState<FurnitureType>("chair");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,10 +70,7 @@ export function ProjectSetup({
     setBusy(true);
     setError(null);
     try {
-      const created = await api.furniture.create(project.id, {
-        name: pieceName,
-        furniture_type: pieceType,
-      });
+      const created = await api.furniture.create(project.id, { name: pieceName });
       setPieces((items) => [created, ...items]);
       onFurniture(created);
       setPieceName("");
@@ -95,9 +89,9 @@ export function ProjectSetup({
 
   return (
     <section className="workspace-section">
-      <SectionHeading eyebrow="Step 01 · The work" title="Choose what you’re rebuilding" />
+      <SectionHeading eyebrow="Step 01 · The work" title="Start with the furniture in front of you" />
       <p className="section-intro">
-        Keep related furniture in a project, then choose the exact piece you want to reconstruct.
+        Name the job and the furniture piece. You do not need to decide whether it is a chair, dining table, or bookshelf—the photo analysis does that next.
       </p>
       {error && <Notice tone="danger">{error}</Notice>}
 
@@ -135,22 +129,16 @@ export function ProjectSetup({
                 <span>Existing pieces</span>
                 <select value={furniture?.id ?? ""} onChange={(e) => onFurniture(pieces.find((item) => item.id === e.target.value) ?? null)}>
                   <option value="">Choose a piece…</option>
-                  {pieces.map((item) => <option key={item.id} value={item.id}>{item.name} · {furnitureLabel(item.furniture_type)}</option>)}
+                  {pieces.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.furniture_type ? furnitureLabel(item.furniture_type) : "Awaiting AI"}</option>)}
                 </select>
               </label>
               <div className="divider"><span>or add one</span></div>
               <form onSubmit={createPiece} className="form-stack">
                 <label className="field"><span>Piece name</span><input required maxLength={200} value={pieceName} onChange={(e) => setPieceName(e.target.value)} placeholder="Walnut dining chair" /></label>
-                <fieldset className="type-picker">
-                  <legend>Furniture type</legend>
-                  {furnitureTypes.map((type) => (
-                    <label key={type} className={pieceType === type ? "is-selected" : ""}>
-                      <input type="radio" name="furniture-type" value={type} checked={pieceType === type} onChange={() => setPieceType(type)} />
-                      <span className={`furniture-glyph furniture-glyph--${type}`} aria-hidden="true" />
-                      <strong>{furnitureLabel(type)}</strong>
-                    </label>
-                  ))}
-                </fieldset>
+                <div className="ai-type-note">
+                  <span aria-hidden="true">◎</span>
+                  <div><strong>No type needed</strong><p>WUE will identify chair, dining table, or bookshelf after the photographs are analyzed.</p></div>
+                </div>
                 <button className="button button--secondary" disabled={busy || !pieceName.trim()}>{busy ? <BusyLabel /> : "Add furniture piece"}</button>
               </form>
             </>
@@ -160,7 +148,7 @@ export function ProjectSetup({
 
       {project && furniture && (
         <div className="selection-summary">
-          <span className={`furniture-glyph furniture-glyph--${furniture.furniture_type}`} aria-hidden="true" />
+          {furniture.furniture_type ? <span className={`furniture-glyph furniture-glyph--${furniture.furniture_type}`} aria-hidden="true" /> : <span className="pending-glyph" aria-hidden="true">?</span>}
           <div><small>Ready to begin</small><strong>{project.name} / {furniture.name}</strong></div>
           <button className="button button--primary" onClick={onContinue}>Add five photos <span>→</span></button>
         </div>

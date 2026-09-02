@@ -16,6 +16,17 @@ describe("workflow access", () => {
     expect(canOpenStep("photos", empty)).toBe(false);
   });
 
+  it("keeps measurements locked until an uploaded piece is classified", () => {
+    const unclassified = { ...furniture, furniture_type: null };
+    const images = ["front", "back", "left", "right", "top"].map((view, index) => ({
+      id: String(index), furniture_id: "f", view: view as "front", source: "upload" as const,
+      original_filename: "x.jpg", content_type: "image/jpeg", file_size_bytes: 1,
+      checksum_sha256: "x", pixel_width: 1, pixel_height: 1, created_at: "", updated_at: "",
+    }));
+
+    expect(canOpenStep("dimensions", context({ project, furniture: unclassified, images }))).toBe(false);
+  });
+
   it("requires exactly the five saved views before dimensions", () => {
     const base = context({ project, furniture });
     expect(canOpenStep("photos", base)).toBe(true);

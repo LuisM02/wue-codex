@@ -2,7 +2,7 @@
 
 WUE (Wood U Estimate) is an AI-assisted system for reconstructing wooden furniture, estimating materials and labor, and producing quotations. This repository is a new, independent implementation and supports exactly three furniture types: `chair`, `dining_table`, and `bookshelf`.
 
-Modules 1 through 16 establish the backend foundation, persisted domain resources, five-view image workflow, replaceable classification boundary, canonical overall dimensions, editable parametric 2D plans, validated immutable design revisions, deterministic renderer-ready 3D geometry, separate administrative material and labor-rate catalogs, calculation-only cost domains, immutable quotation snapshots, and the complete guided web interface. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, classification orchestration, deterministic calculations, and health endpoints. The responsive React interface carries the same source records from project setup through printable quotations without mixing visual appearance and costing choices.
+Modules 1 through 17 establish the backend foundation, persisted domain resources, photo-first five-view workflow, replaceable classification boundary, canonical overall dimensions, guided part-by-part 2D editing, validated immutable design revisions, deterministic renderer-ready 3D geometry, separate administrative material and labor-rate catalogs, calculation-only cost domains, immutable quotation snapshots, and the complete guided web interface. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, classification orchestration, deterministic calculations, and health endpoints. The responsive React interface carries the same source records from project setup through printable quotations without mixing visual appearance and costing choices.
 
 ## Repository layout
 
@@ -68,14 +68,14 @@ Five-view image endpoints are:
 - `GET /api/v1/furniture/{furniture_id}/images/{view}/content` — validated encoded image bytes
 - `DELETE /api/v1/furniture/{furniture_id}/images/{view}` — remove metadata and stored bytes
 
-Each furniture item accepts at most one image per required view. JPEG, PNG, and WebP are verified from actual bytes rather than trusting filenames or MIME declarations. Deleting a project or furniture item also removes its stored image objects. Furniture types remain restricted in both API validation and PostgreSQL to `chair`, `dining_table`, and `bookshelf`.
+Each furniture item accepts at most one image per required view. JPEG, PNG, and WebP are verified from actual bytes rather than trusting filenames or MIME declarations. Deleting a project or furniture item also removes its stored image objects. Furniture starts with no assigned type; a successful classifier result or an explicit testing correction may assign only `chair`, `dining_table`, or `bookshelf`.
 
 Classification endpoints are:
 
 - `POST /api/v1/furniture/{furniture_id}/classification` — classify the complete five-view set and persist the latest result
 - `GET /api/v1/furniture/{furniture_id}/classification` — retrieve the latest result
 
-Classification requires all five views and verifies each stored object's SHA-256 integrity before invoking an adapter. The adapter can return only chair, dining table, or bookshelf. A successful prediction updates the furniture type; deleting a source image or manually changing that type invalidates the stored result. The default adapter deliberately returns HTTP 503 because no real AI model is configured yet—it never fabricates a label from filenames or unrelated business state.
+Classification requires all five views and verifies each stored object's SHA-256 integrity before invoking an adapter. The adapter can return only chair, dining table, or bookshelf. A successful prediction updates the furniture type; deleting a source image clears the derived type, while an explicit type correction invalidates the stored classifier result. The default adapter deliberately returns HTTP 503 because no real AI model is configured yet—it never fabricates a label from filenames or unrelated business state. The interface labels its temporary manual type control as a testing fallback. Automated angle validation, same-object detection, and photo-derived component inference are the next provider-backed module, not behavior claimed by this version.
 
 Overall dimension endpoints are:
 
@@ -106,7 +106,9 @@ Parametric 2D plan endpoints are:
 - `POST/GET /api/v1/plans/{plan_id}/quotations` — create and list immutable quotation snapshots
 - `GET/DELETE /api/v1/quotations/{quotation_id}` — retrieve or remove one quotation snapshot
 
-Generation creates the exact chair, dining-table, or bookshelf defaults documented by the WUE scope and locks overall dimensions in the same database transaction. Each overall axis must be at least 1 mm so proportional defaults remain representable at the stored precision; a failed generation leaves dimensions unlocked. A plan snapshots its furniture type, receives a positive revision number, and permits only one active draft for each furniture item. Component geometry is stored as `Decimal` millimeters. X/Y/Z are min-corner positions, rotation is expressed in degrees, quantity defaults to one, and sort order controls deterministic presentation. Draft components may temporarily omit depth and thickness; the later 3D stage will fail clearly if neither can supply extrusion depth.
+Generation is blocked until the furniture has a recognized or explicitly corrected type. It currently creates the exact chair, dining-table, or bookshelf defaults documented by the WUE scope and locks overall dimensions in the same database transaction. Each overall axis must be at least 1 mm so proportional defaults remain representable at the stored precision; a failed generation leaves dimensions unlocked. A plan snapshots its furniture type, receives a positive revision number, and permits only one active draft for each furniture item. Component geometry is stored as `Decimal` millimeters. X/Y/Z are min-corner positions, rotation is expressed in degrees, quantity defaults to one, and sort order controls deterministic presentation. Draft components may temporarily omit depth and thickness; the later 3D stage will fail clearly if neither can supply extrusion depth.
+
+The plan screen presents one selected part at a time. Front and side drawings update immediately as width, height, depth/thickness, or X/Y/Z position changes; all other parts remain visible as context. A front photograph can be shown as a low-opacity visual reference, but it is not treated as a calibrated measurement. Each edited part must be saved before the revision can be finalized. The complete exact-value schedule remains available as a secondary read-only table.
 
 Finalization enforces the approved semantics exactly: chairs require at least one leg plus exactly one seat panel and backrest panel; dining tables require at least one leg plus exactly one tabletop panel; bookshelves require one each of the five carcass panels and at least one uniquely named shelf matching `^shelf_[1-9]\d*$`. Unrecognized components prevent finalization. A finalized plan cannot be edited or directly unfinalized. Creating a revision deep-copies every geometry field into a new draft with new component identities, leaving the source unchanged. Initial-plan generation cannot be used to bypass this copy workflow after plan history exists.
 
@@ -167,7 +169,7 @@ npm install
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173`. The Vite development server proxies `/api` to the backend at `http://localhost:8000`, so no browser CORS configuration is required. The interface guides users through project and furniture selection, five required views, dimensions, editable plan review and finalization, deterministic 3D inspection, separate appearance selection, exact costing, and immutable quotation snapshots.
+Open `http://127.0.0.1:5173`. The Vite development server proxies `/api` to the backend at `http://localhost:8000`, so no browser CORS configuration is required. The interface guides users through an unclassified furniture record, five required views, recognition, dimensions, live part-by-part plan review and finalization, deterministic 3D inspection, separate appearance selection, exact costing, and immutable quotation snapshots.
 
 Run frontend verification from `frontend`:
 

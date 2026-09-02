@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.furniture_classification import FurnitureClassification
+from app.models.furniture import Furniture
 
 
 def get_classification(
@@ -22,3 +23,6 @@ def invalidate_classification(session: Session, furniture_id: UUID) -> None:
     classification = get_classification(session, furniture_id)
     if classification is not None:
         session.delete(classification)
+        furniture = session.get(Furniture, furniture_id)
+        if furniture is not None:
+            furniture.furniture_type = None

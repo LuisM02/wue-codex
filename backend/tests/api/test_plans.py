@@ -134,6 +134,26 @@ def test_generation_requires_dimensions_and_rejects_a_second_draft(
     }
 
 
+def test_generation_requires_classified_furniture(db_client: TestClient) -> None:
+    project = db_client.post("/api/v1/projects", json={"name": "AI workflow"})
+    furniture = db_client.post(
+        f"/api/v1/projects/{project.json()['id']}/furniture",
+        json={"name": "Unclassified piece"},
+    )
+    furniture_id = furniture.json()["id"]
+    db_client.put(
+        f"/api/v1/furniture/{furniture_id}/dimensions",
+        json={"width": 800, "height": 900, "depth": 500, "unit": "mm"},
+    )
+
+    response = db_client.post(f"/api/v1/furniture/{furniture_id}/plans")
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Furniture classification is required before generating a 2D plan"
+    }
+
+
 def test_unusable_dimensions_do_not_become_locked(db_client: TestClient) -> None:
     furniture_id = create_furniture(db_client, with_dimensions=False)
     dimensions_url = f"/api/v1/furniture/{furniture_id}/dimensions"

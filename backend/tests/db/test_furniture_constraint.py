@@ -35,3 +35,24 @@ def test_postgresql_rejects_out_of_scope_furniture_type(
                     "furniture_type": "bed",
                 },
             )
+
+
+def test_postgresql_allows_type_to_await_classification(
+    db_session: Session,
+) -> None:
+    project = create_project(db_session, ProjectCreate(name="Unclassified test"))
+
+    db_session.execute(
+        text(
+            """
+            INSERT INTO furniture (id, project_id, name, furniture_type)
+            VALUES (:id, :project_id, :name, NULL)
+            """
+        ),
+        {
+            "id": str(uuid4()),
+            "project_id": str(project.id),
+            "name": "Awaiting classification",
+        },
+    )
+    db_session.flush()

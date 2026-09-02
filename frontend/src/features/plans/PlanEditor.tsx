@@ -4,17 +4,29 @@ import { BusyLabel, EmptyState, Notice, SectionHeading } from "../../components/
 import { formatNumber, furnitureLabel } from "../../lib/format";
 import { api } from "../../services/apiClient";
 import type { Furniture, FurniturePlan, PlanComponent } from "../../types/api";
-
-type EditableField = "component_name" | "component_type" | "width" | "height" | "depth" | "thickness" | "x" | "y" | "z" | "rotation" | "quantity";
+import { PartWorkshop, type EditableField } from "./PartWorkshop";
 
 interface Props {
   furniture: Furniture;
   plan: FurniturePlan | null;
+  frontImageUrl?: string;
   onPlan: (plan: FurniturePlan) => void;
   onContinue: () => void;
 }
 
-function PlanDrawing({ components }: { components: PlanComponent[] }) {
+function PlanDrawing({
+  components,
+  selectedId,
+  frontImageUrl,
+  showReference,
+  onSelect,
+}: {
+  components: PlanComponent[];
+  selectedId: string | null;
+  frontImageUrl?: string;
+  showReference: boolean;
+  onSelect: (id: string) => void;
+}) {
   const shapes = useMemo(() => {
     if (!components.length) return [];
     const raw = components.map((component) => ({
@@ -48,16 +60,24 @@ function PlanDrawing({ components }: { components: PlanComponent[] }) {
         </pattern>
       </defs>
       <rect className="plan-grid" width="720" height="420" fill="url(#plan-grid)" />
+      {frontImageUrl && showReference && (
+        <image href={frontImageUrl} x="0" y="0" width="720" height="420" preserveAspectRatio="xMidYMid slice" className="plan-reference-image" />
+      )}
       <line className="plan-ground" x1="28" y1="372" x2="692" y2="372" />
       {shapes.map((shape) => (
         <g key={shape.id}>
           <rect
-            className={`plan-shape plan-shape--${shape.type}`}
+            className={`plan-shape plan-shape--${shape.type}${selectedId === shape.id ? " is-selected" : ""}`}
             x={shape.x}
             y={shape.y}
             width={shape.width}
             height={shape.height}
             rx="2"
+            tabIndex={0}
+            role="button"
+            aria-label={`Edit ${shape.name}`}
+            onClick={() => onSelect(shape.id)}
+            onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onSelect(shape.id); }}
           />
           {shape.width > 56 && shape.height > 22 && (
             <text x={shape.x + shape.width / 2} y={shape.y + shape.height / 2 + 4} textAnchor="middle">
@@ -71,12 +91,19 @@ function PlanDrawing({ components }: { components: PlanComponent[] }) {
   );
 }
 
-export function PlanEditor({ furniture, plan, onPlan, onContinue }: Props) {
+export function PlanEditor({ furniture, plan, frontImageUrl, onPlan, onContinue }: Props) {
   const [components, setComponents] = useState<PlanComponent[]>(plan?.components ?? []);
+  const [selectedId, setSelectedId] = useState<string | null>(plan?.components[0]?.id ?? null);
+  const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
+  const [showReference, setShowReference] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => setComponents(plan?.components ?? []), [plan]);
+  useEffect(() => {
+    setComponents(plan?.components ?? []);
+    setSelectedId(plan?.components[0]?.id ?? null);
+    setDirtyIds(new Set());
+  }, [plan?.id]);
 
   async function generate() {
     setBusy("generate");
@@ -95,6 +122,7 @@ export function PlanEditor({ furniture, plan, onPlan, onContinue }: Props) {
       ...item,
       [field]: field === "quantity" ? Number(value) : value,
     } : item));
+    setDirtyIds((items) => new Set(items).add(id));
   }
 
   async function saveComponent(component: PlanComponent) {
@@ -118,6 +146,11 @@ export function PlanEditor({ furniture, plan, onPlan, onContinue }: Props) {
       const saved = await api.plans.updateComponent(plan.id, component.id, payload);
       const next = components.map((item) => item.id === saved.id ? saved : item);
       setComponents(next);
+      setDirtyIds((items) => {
+        const updated = new Set(items);
+        updated.delete(saved.id);
+        return updated;
+      });
       onPlan({ ...plan, components: next });
     } catch (reason) {
       setError((reason as Error).message);
@@ -128,6 +161,10 @@ export function PlanEditor({ furniture, plan, onPlan, onContinue }: Props) {
 
   async function finalize() {
     if (!plan) return;
+    if (dirtyIds.size > 0) {
+      setError(`Save ${dirtyIds.size === 1 ? "the edited part" : `all ${dirtyIds.size} edited parts`} before finalizing the plan.`);
+      return;
+    }
     setBusy("finalize");
     setError(null);
     try {
@@ -158,7 +195,7 @@ export function PlanEditor({ furniture, plan, onPlan, onContinue }: Props) {
         {plan && <span className={`status-badge status-badge--${plan.status}`}>Revision {plan.revision} · {plan.status}</span>}
       </SectionHeading>
       <p className="section-intro">
-        The plan is generated from the overall measurements using fixed rules for a {furnitureLabel(furniture.furniture_type).toLowerCase()}. Adjust a part before locking the revision.
+        The draft starts from the classified {plan ? furnitureLabel(plan.furniture_type).toLowerCase() : "furniture"} structure. Select one part at a time and compare it with the photographs before locking the revision.
       </p>
       {error && <Notice tone="danger">{error}</Notice>}
 
@@ -175,7 +212,21 @@ export function PlanEditor({ furniture, plan, onPlan, onContinue }: Props) {
         <>
           <div className="plan-layout">
             <div className="plan-canvas">
-              <PlanDrawing components={components} />
+              {frontImageUrl && (
+                <div className="plan-canvas__toolbar">
+                  <span>Photo overlay is a visual guide, not a measured trace.</span>
+                  <button type="button" onClick={() => setShowReference((visible) => !visible)}>
+                    {showReference ? "Hide front photo" : "Show front photo"}
+                  </button>
+                </div>
+              )}
+              <PlanDrawing
+                components={components}
+                selectedId={selectedId}
+                frontImageUrl={frontImageUrl}
+                showReference={showReference}
+                onSelect={setSelectedId}
+              />
               <div className="plan-legend"><span><i className="legend-panel" /> Panel</span><span><i className="legend-leg" /> Leg</span></div>
             </div>
             <aside className="plan-summary panel">
@@ -187,37 +238,53 @@ export function PlanEditor({ furniture, plan, onPlan, onContinue }: Props) {
                 <div><dt>Legs</dt><dd>{components.filter((item) => item.component_type === "leg").reduce((sum, item) => sum + item.quantity, 0)}</dd></div>
               </dl>
               {plan.status === "draft" ? (
-                <Notice tone="warning">Save any edited rows before finalizing. A finalized plan cannot be changed.</Notice>
+                <Notice tone={dirtyIds.size ? "danger" : "warning"}>
+                  {dirtyIds.size
+                    ? `${dirtyIds.size} part${dirtyIds.size === 1 ? " has" : "s have"} unsaved changes.`
+                    : "Select a part below to edit it. A finalized plan cannot be changed."}
+                </Notice>
               ) : (
                 <Notice tone="success">This revision is locked and ready for reconstruction and costing.</Notice>
               )}
             </aside>
           </div>
 
-          <div className="component-table-wrap">
-            <div className="component-table__heading"><div><h3>Component schedule</h3><p>All dimensions and positions are in millimeters.</p></div></div>
-            <table className="component-table">
-              <thead><tr><th>Part</th><th>Type</th><th>Width</th><th>Height</th><th>Depth</th><th>Thick.</th><th>X</th><th>Y</th><th>Z</th><th>Qty.</th>{plan.status === "draft" && <th />}</tr></thead>
-              <tbody>
-                {components.map((component) => (
-                  <tr key={component.id}>
-                    <td><input aria-label="Part name" disabled={plan.status !== "draft"} value={component.component_name} onChange={(e) => edit(component.id, "component_name", e.target.value)} /></td>
-                    <td><select aria-label="Part type" disabled={plan.status !== "draft"} value={component.component_type} onChange={(e) => edit(component.id, "component_type", e.target.value)}><option value="panel">Panel</option><option value="leg">Leg</option></select></td>
-                    {(["width", "height", "depth", "thickness", "x", "y", "z"] as EditableField[]).map((field) => (
-                      <td key={field}><input aria-label={field} disabled={plan.status !== "draft"} type="number" step="any" min={["width", "height", "depth", "thickness"].includes(field) ? "0.0001" : undefined} value={(component[field as keyof PlanComponent] as string | null) ?? ""} onChange={(e) => edit(component.id, field, e.target.value)} /></td>
-                    ))}
-                    <td><input aria-label="Quantity" disabled={plan.status !== "draft"} type="number" min="1" step="1" value={component.quantity} onChange={(e) => edit(component.id, "quantity", e.target.value)} /></td>
-                    {plan.status === "draft" && <td><button className="table-save" onClick={() => saveComponent(component)} disabled={busy === component.id}>{busy === component.id ? "…" : "Save"}</button></td>}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <PartWorkshop
+            components={components}
+            selectedId={selectedId}
+            disabled={plan.status !== "draft"}
+            busy={busy === selectedId}
+            dirtyIds={dirtyIds}
+            onSelect={setSelectedId}
+            onChange={edit}
+            onSave={saveComponent}
+          />
+
+          <details className="component-schedule">
+            <summary><div><strong>Full component schedule</strong><small>Exact saved values for every part</small></div><span>Show table</span></summary>
+            <div className="component-table-wrap">
+              <table className="component-table">
+                <thead><tr><th>Part</th><th>Type</th><th>Width</th><th>Height</th><th>Depth</th><th>Thick.</th><th>X</th><th>Y</th><th>Z</th><th>Qty.</th></tr></thead>
+                <tbody>
+                  {components.map((component) => (
+                    <tr key={component.id} className={component.id === selectedId ? "is-selected" : undefined} onClick={() => setSelectedId(component.id)}>
+                      <td>{component.component_name.replaceAll("_", " ")}</td>
+                      <td>{component.component_type}</td>
+                      {(["width", "height", "depth", "thickness", "x", "y", "z"] as const).map((field) => (
+                        <td key={field}>{component[field] === null ? "—" : formatNumber(component[field] as string, 1)}</td>
+                      ))}
+                      <td>{component.quantity}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
 
           <div className="section-footer">
             <div><small>Current plan</small><strong>Revision {plan.revision} · {formatNumber(components.length, 0)} component definitions</strong></div>
             {plan.status === "draft" ? (
-              <button className="button button--primary" onClick={finalize} disabled={Boolean(busy)}>{busy === "finalize" ? <BusyLabel>Validating…</BusyLabel> : "Finalize plan"}</button>
+              <button className="button button--primary" onClick={finalize} disabled={Boolean(busy) || dirtyIds.size > 0}>{busy === "finalize" ? <BusyLabel>Validating…</BusyLabel> : dirtyIds.size ? "Save edited parts first" : "Finalize plan"}</button>
             ) : (
               <div className="button-row">
                 <button className="button button--secondary" onClick={revise} disabled={Boolean(busy)}>{busy === "revise" ? <BusyLabel>Copying…</BusyLabel> : "Create editable revision"}</button>

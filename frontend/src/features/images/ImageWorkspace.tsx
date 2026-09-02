@@ -7,6 +7,7 @@ import type {
   Furniture,
   FurnitureClassification,
   FurnitureImage,
+  FurnitureType,
   ImageView,
 } from "../../types/api";
 
@@ -24,6 +25,7 @@ interface Props {
   classification: FurnitureClassification | null;
   onImages: (images: FurnitureImage[]) => void;
   onClassification: (value: FurnitureClassification | null) => void;
+  onFurniture: (value: Furniture) => void;
   onContinue: () => void;
 }
 
@@ -33,12 +35,14 @@ export function ImageWorkspace({
   classification,
   onImages,
   onClassification,
+  onFurniture,
   onContinue,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [pendingView, setPendingView] = useState<ImageView | null>(null);
   const [busyView, setBusyView] = useState<ImageView | null>(null);
   const [classifying, setClassifying] = useState(false);
+  const [manualType, setManualType] = useState<FurnitureType>("chair");
   const [error, setError] = useState<string | null>(null);
   const complete = images.length === views.length;
 
@@ -71,6 +75,7 @@ export function ImageWorkspace({
     try {
       await api.images.remove(furniture.id, view);
       onImages(images.filter((item) => item.view !== view));
+      if (classification) onFurniture({ ...furniture, furniture_type: null });
       onClassification(null);
     } catch (reason) {
       setError((reason as Error).message);
@@ -83,10 +88,12 @@ export function ImageWorkspace({
     setClassifying(true);
     setError(null);
     try {
-      onClassification(await api.classification.run(furniture.id));
+      const detected = await api.classification.run(furniture.id);
+      onClassification(detected);
+      onFurniture({ ...furniture, furniture_type: detected.predicted_type });
     } catch (reason) {
       if (reason instanceof ApiError && reason.status === 503) {
-        setError("Automated recognition is not connected yet. Your selected furniture type is kept, so you can continue measuring the piece.");
+        setError("Automated recognition is not connected yet. For this local test, use the clearly marked manual confirmation below; it will be removed once the vision provider is connected.");
       } else {
         setError((reason as Error).message);
       }
@@ -95,15 +102,27 @@ export function ImageWorkspace({
     }
   }
 
+  async function confirmType() {
+    setClassifying(true);
+    setError(null);
+    try {
+      onFurniture(await api.furniture.update(furniture.id, { furniture_type: manualType }));
+    } catch (reason) {
+      setError((reason as Error).message);
+    } finally {
+      setClassifying(false);
+    }
+  }
+
   return (
     <section className="workspace-section">
-      <SectionHeading eyebrow="Step 02 · Visual reference" title="Photograph all five sides">
+      <SectionHeading eyebrow="Step 02 · Visual reference" title="Show WUE the complete furniture">
         <span className={`progress-pill${complete ? " is-complete" : ""}`}>
           {complete ? "✓ Complete" : `${images.length} of 5 added`}
         </span>
       </SectionHeading>
       <p className="section-intro">
-        Even lighting and straight-on angles make the reconstruction easier to verify. JPEG, PNG, and WebP images are accepted.
+        Add five clear angles of the same piece. Each requested view is marked for automated angle and same-object validation; JPEG, PNG, and WebP images are accepted.
       </p>
       {error && <Notice tone="warning">{error}</Notice>}
       <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={upload} />
@@ -147,6 +166,8 @@ export function ImageWorkspace({
           <small>Furniture recognition</small>
           {classification ? (
             <strong>{furnitureLabel(classification.predicted_type)}{classification.confidence ? ` · ${Math.round(Number(classification.confidence) * 100)}% confidence` : ""}</strong>
+          ) : furniture.furniture_type ? (
+            <strong>{furnitureLabel(furniture.furniture_type)} · confirmed manually</strong>
           ) : (
             <strong>{complete ? "Five views are ready to check" : "Available after all five photos"}</strong>
           )}
@@ -156,12 +177,33 @@ export function ImageWorkspace({
         </button>
       </div>
 
+      {complete && !classification && !furniture.furniture_type && (
+        <div className="manual-classification panel">
+          <div>
+            <p className="eyebrow">Testing fallback</p>
+            <h3>Confirm the type manually</h3>
+            <p>The real vision provider is not connected yet. Use this only to continue testing the reconstruction workflow.</p>
+          </div>
+          <label className="field">
+            <span>Furniture type</span>
+            <select value={manualType} onChange={(event) => setManualType(event.target.value as FurnitureType)}>
+              <option value="chair">Chair</option>
+              <option value="dining_table">Dining table</option>
+              <option value="bookshelf">Bookshelf</option>
+            </select>
+          </label>
+          <button className="button button--secondary" disabled={classifying} onClick={confirmType}>
+            {classifying ? <BusyLabel>Saving…</BusyLabel> : "Confirm for testing"}
+          </button>
+        </div>
+      )}
+
       <div className="section-footer">
         <div>
           <small>Selected piece</small>
-          <strong>{furniture.name} · {furnitureLabel(furniture.furniture_type)}</strong>
+          <strong>{furniture.name} · {furniture.furniture_type ? furnitureLabel(furniture.furniture_type) : "Awaiting recognition"}</strong>
         </div>
-        <button className="button button--primary" disabled={!complete} onClick={onContinue}>Set dimensions <span>→</span></button>
+        <button className="button button--primary" disabled={!complete || !furniture.furniture_type} onClick={onContinue}>Set dimensions <span>→</span></button>
       </div>
     </section>
   );

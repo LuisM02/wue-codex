@@ -55,8 +55,10 @@ export const api = {
   },
   furniture: {
     list: (projectId: UUID) => request<Furniture[]>(`/projects/${projectId}/furniture`),
-    create: (projectId: UUID, payload: { name: string; furniture_type: FurnitureType }) =>
+    create: (projectId: UUID, payload: { name: string; furniture_type?: FurnitureType }) =>
       request<Furniture>(`/projects/${projectId}/furniture`, { method: "POST", body: JSON.stringify(payload) }),
+    update: (furnitureId: UUID, payload: { name?: string; furniture_type?: FurnitureType }) =>
+      request<Furniture>(`/furniture/${furnitureId}`, { method: "PATCH", body: JSON.stringify(payload) }),
   },
   images: {
     list: (furnitureId: UUID) => request<FurnitureImage[]>(`/furniture/${furnitureId}/images`),

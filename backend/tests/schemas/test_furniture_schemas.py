@@ -24,6 +24,12 @@ def test_furniture_create_accepts_only_supported_types(
     assert furniture.furniture_type is expected
 
 
+def test_furniture_create_starts_unclassified_when_type_is_omitted() -> None:
+    furniture = FurnitureCreate(name="Unknown photographed piece")
+
+    assert furniture.furniture_type is None
+
+
 @pytest.mark.parametrize("raw_value", ["bed", "sofa", "lamp_shade", "CHAIR"])
 def test_furniture_create_rejects_unsupported_types(raw_value: str) -> None:
     with pytest.raises(ValidationError):

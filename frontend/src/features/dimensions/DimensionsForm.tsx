@@ -26,6 +26,7 @@ interface Props {
 }
 
 export function DimensionsForm({ furniture, dimensions, onDimensions, onContinue }: Props) {
+  const furnitureType = furniture.furniture_type;
   const [unit, setUnit] = useState<DimensionUnit>(dimensions?.unit ?? "mm");
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
@@ -46,6 +47,8 @@ export function DimensionsForm({ furniture, dimensions, onDimensions, onContinue
     () => [width, height, depth].every((value) => Number(value) > 0 && Number.isFinite(Number(value))),
     [width, height, depth],
   );
+
+  if (!furnitureType) return null;
 
   function changeUnit(nextUnit: DimensionUnit) {
     if (valid) {
@@ -89,18 +92,18 @@ export function DimensionsForm({ furniture, dimensions, onDimensions, onContinue
 
       <div className="measurement-layout">
         <div className="measurement-visual" aria-hidden="true">
-          <div className={`dimension-sketch dimension-sketch--${furniture.furniture_type}`}>
+          <div className={`dimension-sketch dimension-sketch--${furnitureType}`}>
             <span className="dimension-line dimension-line--width"><i /><b>{width || "W"} {unit}</b></span>
             <span className="dimension-line dimension-line--height"><i /><b>{height || "H"} {unit}</b></span>
             <span className="dimension-line dimension-line--depth"><i /><b>{depth || "D"} {unit}</b></span>
             <div className="dimension-sketch__object">
-              <span className={`furniture-glyph furniture-glyph--${furniture.furniture_type}`} />
+              <span className={`furniture-glyph furniture-glyph--${furnitureType}`} />
             </div>
           </div>
           <div className="measurement-visual__caption">
             <small>Measuring</small>
             <strong>{furniture.name}</strong>
-            <span>{furnitureLabel(furniture.furniture_type)}</span>
+            <span>{furnitureLabel(furnitureType)}</span>
           </div>
         </div>
 

@@ -202,6 +202,9 @@ def test_image_or_manual_type_change_invalidates_classification(
         f"/api/v1/furniture/{furniture_id}/images/top"
     ).status_code == 204
     assert db_client.get(classification_url).status_code == 404
+    assert db_client.get(
+        f"/api/v1/furniture/{furniture_id}"
+    ).json()["furniture_type"] is None
 
     upload_views(db_client, furniture_id, image_bytes_factory, ("top",))
     assert db_client.post(classification_url).status_code == 200

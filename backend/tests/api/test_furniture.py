@@ -32,6 +32,18 @@ def test_create_each_supported_furniture_type(
     assert response.json()["furniture_type"] == furniture_type
 
 
+def test_create_furniture_without_preselecting_type(db_client: TestClient) -> None:
+    project_id = create_project(db_client)
+
+    response = db_client.post(
+        f"/api/v1/projects/{project_id}/furniture",
+        json={"name": "Piece awaiting image analysis"},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["furniture_type"] is None
+
+
 @pytest.mark.parametrize("furniture_type", ["bed", "sofa", "lamp_shade"])
 def test_rejects_out_of_scope_furniture_types(
     db_client: TestClient,

@@ -14,7 +14,7 @@ class FurnitureCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: Name
-    furniture_type: FurnitureType
+    furniture_type: FurnitureType | None = None
 
 
 class FurnitureUpdate(BaseModel):
@@ -40,6 +40,6 @@ class FurnitureRead(BaseModel):
     id: UUID
     project_id: UUID
     name: str
-    furniture_type: FurnitureType
+    furniture_type: FurnitureType | None
     created_at: datetime
     updated_at: datetime
