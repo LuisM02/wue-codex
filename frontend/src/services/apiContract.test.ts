@@ -78,6 +78,7 @@ describe("frontend/backend API route contract", () => {
       api.plans.deleteComponent("plan-id", "component-id"),
       api.plans.finalize("plan-id"),
       api.plans.revise("plan-id"),
+      api.plans.rebuildFromPhotos("plan-id"),
       api.plans.geometry("plan-id"),
       api.plans.materialQuantity("plan-id"),
       api.plans.hardwareQuantity("plan-id"),

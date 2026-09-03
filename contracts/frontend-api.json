@@ -25,6 +25,7 @@
     { "method": "DELETE", "path": "/api/v1/plans/{plan_id}/components/{component_id}" },
     { "method": "POST", "path": "/api/v1/plans/{plan_id}/finalize" },
     { "method": "POST", "path": "/api/v1/plans/{plan_id}/revisions" },
+    { "method": "POST", "path": "/api/v1/plans/{plan_id}/revisions/from-reconstruction" },
     { "method": "GET", "path": "/api/v1/plans/{plan_id}/geometry-3d" },
     { "method": "GET", "path": "/api/v1/plans/{plan_id}/material-quantity" },
     { "method": "GET", "path": "/api/v1/plans/{plan_id}/material-cost" },

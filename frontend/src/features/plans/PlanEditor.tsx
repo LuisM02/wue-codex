@@ -192,6 +192,20 @@ export function PlanEditor({ furniture, plan, frontImageUrl, onPlan, onContinue 
     }
   }
 
+  async function rebuildFromPhotos() {
+    if (!plan) return;
+    setBusy("rebuild");
+    setError(null);
+    try {
+      await api.reconstruction.run(furniture.id);
+      onPlan(await api.plans.rebuildFromPhotos(plan.id));
+    } catch (reason) {
+      setError((reason as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <section className="workspace-section workspace-section--wide workspace-section--cad">
       <SectionHeading eyebrow="Step 04 · Parametric CAD" title={plan ? "Furniture 2D editor" : "Build the 2D furniture model"}>
@@ -235,6 +249,7 @@ export function PlanEditor({ furniture, plan, frontImageUrl, onPlan, onContinue 
             </div>
             {plan.status === "finalized" && (
               <div className="button-row">
+                <button className="button button--secondary" onClick={rebuildFromPhotos} disabled={Boolean(busy)}>{busy === "rebuild" ? <BusyLabel>Analyzing…</BusyLabel> : "Rebuild from photos"}</button>
                 <button className="button button--secondary" onClick={revise} disabled={Boolean(busy)}>{busy === "revise" ? <BusyLabel>Copying…</BusyLabel> : "Create editable revision"}</button>
                 <button className="button button--primary" onClick={onContinue}>View 3D model <span>→</span></button>
               </div>

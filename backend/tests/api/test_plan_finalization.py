@@ -214,6 +214,47 @@ def test_finalized_revision_can_produce_revision_three(
     ]
 
 
+def test_finalized_plan_can_rebuild_next_revision_from_latest_photos(
+    db_client: TestClient,
+) -> None:
+    first = create_draft(db_client)
+    finalized = db_client.post(
+        f"/api/v1/plans/{first['id']}/finalize"
+    ).json()
+    furniture_id = finalized["furniture_id"]
+    reconstruction_response = db_client.post(
+        f"/api/v1/furniture/{furniture_id}/reconstruction"
+    )
+    assert reconstruction_response.status_code == 200
+    reconstruction = reconstruction_response.json()
+
+    response = db_client.post(
+        f"/api/v1/plans/{finalized['id']}/revisions/from-reconstruction"
+    )
+
+    assert response.status_code == 201
+    rebuilt = response.json()
+    assert rebuilt["revision"] == 2
+    assert rebuilt["status"] == "draft"
+    assert rebuilt["source_reconstruction_id"] == reconstruction["id"]
+    assert {item["source_reconstruction_part_id"] for item in rebuilt["components"]} == {
+        item["id"] for item in reconstruction["parts"]
+    }
+    original = db_client.get(
+        f"/api/v1/plans/{finalized['id']}"
+    ).json()
+    assert original["status"] == "finalized"
+    assert [geometry(item) for item in original["components"]] == [
+        geometry(item) for item in finalized["components"]
+    ]
+    assert db_client.post(
+        f"/api/v1/plans/{finalized['id']}/revisions/from-reconstruction"
+    ).status_code == 409
+    assert db_client.post(
+        f"/api/v1/plans/{rebuilt['id']}/revisions/from-reconstruction"
+    ).status_code == 409
+
+
 def test_draft_cannot_be_used_as_revision_source(db_client: TestClient) -> None:
     draft = create_draft(db_client)
 

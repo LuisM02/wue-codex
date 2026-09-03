@@ -150,7 +150,7 @@ def _files_for(factory) -> tuple[dict, list[dict[str, str]]]:
 
 
 def test_health_and_model_status_are_honest(client: TestClient) -> None:
-    assert client.get("/health").json()["version"] == "0.2.1"
+    assert client.get("/health").json()["version"] == "0.3.0"
     status = client.get("/v1/model-status").json()
     assert status["ready"] is True
     assert status["uses_gpu"] is False
@@ -244,7 +244,16 @@ def test_worker_classifies_and_reconstructs_a_photo_derived_chair(
     body = response.json()
     names = [part["component_name"] for part in body["parts"]]
     assert names[:2] == ["seat", "backrest"]
-    assert any(part["component_type"] == "leg" for part in body["parts"])
+    assert {
+        "front_left_leg",
+        "front_right_leg",
+        "rear_left_leg",
+        "rear_right_leg",
+    }.issubset(names)
+    assert not any(name.endswith("_support") for name in names)
+    assert len(
+        [part for part in body["parts"] if part["component_type"] == "leg"]
+    ) == 4
     assert all(part["geometry_kind"] == "extruded_profile" for part in body["parts"])
     assert all(len(part["profile_points"]) >= 3 for part in body["parts"])
     assert "does not yet run SAM 2" in body["warnings"][0]

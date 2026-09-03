@@ -98,6 +98,7 @@ export const api = {
       request<void>(`/plans/${planId}/components/${componentId}`, { method: "DELETE" }),
     finalize: (planId: UUID) => request<FurniturePlan>(`/plans/${planId}/finalize`, { method: "POST" }),
     revise: (planId: UUID) => request<FurniturePlan>(`/plans/${planId}/revisions`, { method: "POST" }),
+    rebuildFromPhotos: (planId: UUID) => request<FurniturePlan>(`/plans/${planId}/revisions/from-reconstruction`, { method: "POST" }),
     geometry: (planId: UUID) => request<PlanGeometry>(`/plans/${planId}/geometry-3d`),
     materialQuantity: (planId: UUID) => request<MaterialQuantity>(`/plans/${planId}/material-quantity`),
     hardwareQuantity: (planId: UUID) => request<HardwareQuantity>(`/plans/${planId}/hardware-quantity`),

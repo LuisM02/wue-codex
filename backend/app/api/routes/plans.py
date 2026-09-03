@@ -176,10 +176,34 @@ def create_revision(
     plan = require_plan(session, plan_id)
     try:
         return plan_service.create_revision(session, plan)
-    except plan_service.PlanRevisionSourceError as exc:
+    except (
+        plan_service.PlanRevisionSourceError,
+        plan_service.DraftPlanExistsError,
+    ) as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-    except plan_service.DraftPlanExistsError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@plans_router.post(
+    "/{plan_id}/revisions/from-reconstruction",
+    response_model=FurniturePlanRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_reconstruction_revision(
+    plan_id: UUID,
+    session: SessionDependency,
+) -> FurniturePlanRead:
+    plan = require_plan(session, plan_id)
+    try:
+        return plan_service.create_reconstruction_revision(session, plan)
+    except (
+        plan_service.PlanRevisionSourceError,
+        plan_service.DraftPlanExistsError,
+        plan_service.PhotoReconstructionRequiredError,
+    ) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
 
 @plans_router.post(

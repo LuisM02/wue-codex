@@ -4,7 +4,9 @@ This process is deliberately separate from the business API. It receives exactly
 
 The default pipeline is a lightweight baseline that runs immediately on Windows without downloading a model checkpoint. It traces the actual silhouettes, checks opposite-view consistency and expected orientation, identifies structural regions, and scales them to the user's measurements. It is most reliable when one furniture item is photographed against a plain contrasting background.
 
-Version `0.2.1` contains a lazy SAM 2.1 adapter. When deliberately configured, it prompts SAM with the centered furniture capture area instead of trusting a clutter-sensitive color outline, replaces the foreground mask with SAM's selected mask, and records the neural provider/checkpoint provenance in the existing response contract. It never silently downloads a checkpoint and never claims dense 3D reconstruction is loaded.
+Version `0.3.0` contains a lazy SAM 2.1 adapter and photo-derived chair structural fitting. When deliberately configured, it prompts SAM with the centered furniture capture area instead of trusting a clutter-sensitive color outline, replaces the foreground mask with SAM's selected mask, and records the neural provider/checkpoint provenance in the existing response contract. Chair fitting separates the dense seat and backrest bands, persistent lower leg columns, visible backrest posts, and horizontal stretchers across the front and side silhouettes. It never silently downloads a checkpoint and never claims dense 3D reconstruction or trained semantic part recognition is loaded.
+
+Existing finalized designs can use **Rebuild from photos** in the plan editor to create a new draft from a fresh analysis. The previous finalized geometry is retained. This structural fitting is provisional: it is not a manufacturing cut list or a guarantee of the photographed furniture's exact construction, especially for upholstery, concealed joints, and occluded parts.
 
 ## Optional SAM 2.1 provider
 

@@ -91,6 +91,8 @@ def trace_region(
     y_stop: int,
     overall_width: float,
     overall_height: float,
+    *,
+    primary_span_only: bool = False,
 ) -> TracedRegion:
     left, top, _, _ = view.bbox
     object_width, object_height = view.object_width, view.object_height
@@ -102,6 +104,29 @@ def trace_region(
             for local_x in range(max(0, x_start), min(object_width, x_stop))
             if view.mask[absolute_y * view.width + left + local_x]
         ]
+        if primary_span_only and xs:
+            spans = _spans(
+                [
+                    1.0
+                    if view.mask[absolute_y * view.width + left + local_x]
+                    else 0.0
+                    for local_x in range(
+                        max(0, x_start), min(object_width, x_stop)
+                    )
+                ],
+                0.5,
+                gap=1,
+                minimum=1,
+            )
+            if spans:
+                row_offset = max(0, x_start)
+                primary = max(spans, key=lambda span: span[1] - span[0])
+                xs = list(
+                    range(
+                        row_offset + primary[0],
+                        row_offset + primary[1],
+                    )
+                )
         if xs:
             occupied.append((local_y, min(xs), max(xs) + 1))
     if not occupied:
@@ -218,11 +243,189 @@ def _leg_regions(view: AnalyzedView, start_y: int) -> list[tuple[int, int]]:
     return spans
 
 
+def _dominant_band(
+    view: AnalyzedView,
+    start_y: int,
+    stop_y: int,
+    *,
+    minimum_density: float,
+) -> tuple[int, int, int]:
+    """Return the strongest sustained photographed band inside a row range."""
+    rows = _smooth(view.rows(), radius=1)
+    start = max(0, min(len(rows) - 1, start_y))
+    stop = max(start + 1, min(len(rows), stop_y))
+    window = rows[start:stop]
+    peak = max(window)
+    threshold = max(minimum_density, peak * 0.68)
+    spans = _spans(
+        window,
+        threshold,
+        gap=2,
+        minimum=max(2, view.object_height // 100),
+    )
+    if not spans:
+        return _strongest_band(
+            view,
+            start / view.object_height,
+            stop / view.object_height,
+        )
+    local_start, local_stop = max(
+        spans,
+        key=lambda span: sum(window[span[0] : span[1]]),
+    )
+    band_start = start + local_start
+    band_stop = start + local_stop
+    center = max(
+        range(band_start, band_stop),
+        key=lambda index: rows[index],
+    )
+    return band_start, band_stop, center
+
+
+def _chair_leg_regions(
+    view: AnalyzedView, seat_bottom: int
+) -> list[tuple[int, int]]:
+    """Find legs below horizontal rails, where their columns are separable."""
+    start = max(seat_bottom + 2, round(view.object_height * 0.72))
+    stop = min(view.object_height, max(start + 2, round(view.object_height * 0.96)))
+    values = view.columns(start, stop)
+    spans = _spans(
+        values,
+        0.48,
+        gap=max(1, view.object_width // 100),
+        minimum=max(2, view.object_width // 100),
+    )
+    if len(spans) < 2:
+        spans = _spans(
+            values,
+            0.30,
+            gap=max(1, view.object_width // 100),
+            minimum=max(2, view.object_width // 100),
+        )
+    if len(spans) < 2:
+        return _leg_regions(view, start)
+    if len(spans) > 2:
+        spans = sorted(
+            spans,
+            key=lambda item: sum(values[item[0] : item[1]]),
+            reverse=True,
+        )[:2]
+    return sorted(spans)
+
+
+def _rectangle_region(
+    width: float,
+    height: float,
+    x: float,
+    y: float,
+) -> TracedRegion:
+    measured_width = _rounded(width)
+    measured_height = _rounded(height)
+    return TracedRegion(
+        width=measured_width,
+        height=measured_height,
+        x=_rounded(x),
+        y=_rounded(y),
+        points=[
+            ProfilePoint(u=0, v=0),
+            ProfilePoint(u=measured_width, v=0),
+            ProfilePoint(u=measured_width, v=measured_height),
+            ProfilePoint(u=0, v=measured_height),
+        ],
+    )
+
+
+def _chair_rail_region(
+    view: AnalyzedView,
+    seat_bottom: int,
+    leg_spans: list[tuple[int, int]],
+    overall_width: float,
+    overall_height: float,
+) -> TracedRegion | None:
+    """Trace a wide horizontal stretcher while ignoring the two leg columns."""
+    if len(leg_spans) != 2:
+        return None
+    interior_start = leg_spans[0][1]
+    interior_stop = leg_spans[1][0]
+    if interior_stop - interior_start < max(4, view.object_width // 8):
+        return None
+    start_y = max(
+        seat_bottom + max(2, round(view.object_height * 0.05)),
+        round(view.object_height * 0.59),
+    )
+    stop_y = min(view.object_height, round(view.object_height * 0.86))
+    if stop_y - start_y < 2:
+        return None
+
+    row_spans: list[tuple[int, tuple[int, int], int]] = []
+    left, top, _, _ = view.bbox
+    for y in range(start_y, stop_y):
+        values = [
+            view.mask[(top + y) * view.width + left + x]
+            for x in range(interior_start, interior_stop)
+        ]
+        spans = _spans(values, 0.5, gap=1, minimum=2)
+        if spans:
+            longest = max(spans, key=lambda span: span[1] - span[0])
+            row_spans.append(
+                (
+                    y,
+                    (interior_start + longest[0], interior_start + longest[1]),
+                    longest[1] - longest[0],
+                )
+            )
+    if not row_spans:
+        return None
+    peak = max(item[2] for item in row_spans)
+    if peak < max(4, round(view.object_width * 0.20)):
+        return None
+    qualifying = [
+        item for item in row_spans if item[2] >= max(3, round(peak * 0.65))
+    ]
+    bands = _spans(
+        [
+            1.0 if any(item[0] == y for item in qualifying) else 0.0
+            for y in range(start_y, stop_y)
+        ],
+        0.5,
+        gap=2,
+        minimum=2,
+    )
+    if not bands:
+        return None
+    band = max(
+        bands,
+        key=lambda span: sum(
+            item[2]
+            for item in qualifying
+            if start_y + span[0] <= item[0] < start_y + span[1]
+        ),
+    )
+    band_start, band_stop = start_y + band[0], start_y + band[1]
+    selected = [item for item in qualifying if band_start <= item[0] < band_stop]
+    x_start = min(item[1][0] for item in selected)
+    x_stop = max(item[1][1] for item in selected)
+    return trace_region(
+        view,
+        x_start,
+        band_start,
+        x_stop,
+        band_stop,
+        overall_width,
+        overall_height,
+    )
+
+
 def _chair(
     views: dict[str, AnalyzedView], width: float, height: float, depth: float
 ) -> tuple[list[PartProposal], list[str]]:
     front, side = views["front"], views["left"]
-    seat_top, seat_bottom, seat_center = _strongest_band(front, 0.38, 0.72)
+    seat_top, seat_bottom, seat_center = _dominant_band(
+        front,
+        round(front.object_height * 0.28),
+        round(front.object_height * 0.64),
+        minimum_density=0.52,
+    )
     side_center = round(seat_center / front.object_height * side.object_height)
     side_half_band = max(
         2,
@@ -240,6 +443,7 @@ def _chair(
         seat_bottom,
         width,
         height,
+        primary_span_only=True,
     )
     seat_depth, seat_z = _depth_geometry(
         side,
@@ -261,13 +465,29 @@ def _chair(
     ]
     if seat_top <= max(3, front.object_height // 12):
         raise ValueError("The chair backrest could not be separated from the seat")
+    back_top, back_bottom, _ = _dominant_band(
+        front,
+        0,
+        seat_top,
+        minimum_density=0.48,
+    )
     backrest = trace_region(
-        front, 0, 0, front.object_width, seat_top, width, height
+        front,
+        0,
+        back_top,
+        front.object_width,
+        back_bottom,
+        width,
+        height,
+        primary_span_only=True,
     )
     back_depth, back_z = _depth_geometry(
         side,
-        0,
-        max(2, round(seat_top / front.object_height * side.object_height)),
+        round(back_top / front.object_height * side.object_height),
+        max(
+            2,
+            round(back_bottom / front.object_height * side.object_height),
+        ),
         depth,
     )
     parts.append(
@@ -283,13 +503,51 @@ def _chair(
         )
     )
 
-    front_spans = _leg_regions(front, seat_bottom)
+    order = 2
+    post_spans = _spans(
+        front.columns(back_bottom, seat_top),
+        0.42,
+        gap=max(1, front.object_width // 100),
+        minimum=max(2, front.object_width // 100),
+    )
+    if len(post_spans) > 2:
+        post_spans = sorted(
+            post_spans,
+            key=lambda span: span[1] - span[0],
+            reverse=True,
+        )[:2]
+        post_spans.sort()
+    if len(post_spans) == 2:
+        for label, span in zip(("left", "right"), post_spans, strict=True):
+            post = trace_region(
+                front,
+                span[0],
+                back_bottom,
+                span[1],
+                seat_top,
+                width,
+                height,
+            )
+            parts.append(
+                _proposal(
+                    f"{label}_backrest_post",
+                    "panel",
+                    post,
+                    back_depth,
+                    back_z,
+                    order,
+                    0.55,
+                    ["front", "back", "left", "right"],
+                )
+            )
+            order += 1
+
+    front_spans = _chair_leg_regions(front, seat_bottom)
     side_start = min(
         side.object_height - 1,
         round(seat_bottom / front.object_height * side.object_height),
     )
-    depth_spans = _leg_regions(side, side_start)
-    order = 2
+    depth_spans = _chair_leg_regions(side, side_start)
     front_labels = ["left", "right"] if len(front_spans) == 2 else ["center"]
     depth_labels = ["front", "rear"] if len(depth_spans) == 2 else ["center"]
     for depth_index, depth_span in enumerate(depth_spans):
@@ -330,8 +588,65 @@ def _chair(
                 )
             )
             order += 1
+
+    front_rail = _chair_rail_region(
+        front,
+        seat_bottom,
+        front_spans,
+        width,
+        height,
+    )
+    if front_rail is not None and depth_spans:
+        front_depth_span = depth_spans[0]
+        parts.append(
+            _proposal(
+                "front_stretcher",
+                "panel",
+                front_rail,
+                (front_depth_span[1] - front_depth_span[0])
+                / side.object_width
+                * depth,
+                front_depth_span[0] / side.object_width * depth,
+                order,
+                0.5,
+                ["front", "back"],
+            )
+        )
+        order += 1
+
+    side_rail = _chair_rail_region(
+        side,
+        side_start,
+        depth_spans,
+        depth,
+        height,
+    )
+    if side_rail is not None and len(front_spans) == 2:
+        for label, span in zip(("left", "right"), front_spans, strict=True):
+            x = span[0] / front.object_width * width
+            rail_width = (span[1] - span[0]) / front.object_width * width
+            rail = _rectangle_region(
+                rail_width,
+                side_rail.height,
+                x,
+                side_rail.y,
+            )
+            parts.append(
+                _proposal(
+                    f"{label}_stretcher",
+                    "panel",
+                    rail,
+                    side_rail.width,
+                    side_rail.x,
+                    order,
+                    0.5,
+                    ["left", "right"],
+                )
+            )
+            order += 1
     warnings = [
         "Hidden joinery and occluded rear surfaces are inferred; verify them in the part editor",
+        "Seat, backrest, posts, legs, and visible stretchers are separated from the photographed silhouette; confirm overlapping rails before manufacture",
         "Front/back and left/right labels assume the photographs were placed in the requested slots",
     ]
     return parts, warnings
@@ -549,7 +864,7 @@ def reconstruct(
     depth: float,
     input_warnings: list[str],
     provider_name: str = "wue-five-view-silhouette",
-    provider_version: str = "0.2.0",
+    provider_version: str = "0.3.0",
     pipeline_warning: str = (
         "This local pipeline traces real silhouettes but does not yet run SAM 2 "
         "or dense multi-view depth"
