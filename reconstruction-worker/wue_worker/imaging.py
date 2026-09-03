@@ -11,6 +11,8 @@ from statistics import median
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
+from .segmentation import SegmentationProvider
+
 REQUIRED_VIEWS = ("front", "back", "left", "right", "top")
 MAX_ANALYSIS_EDGE = 448
 
@@ -124,7 +126,11 @@ def _clean_mask(raw: bytearray, width: int, height: int) -> bytearray:
     return cleaned
 
 
-def analyze_image(name: str, data: bytes) -> AnalyzedView:
+def analyze_image(
+    name: str,
+    data: bytes,
+    segmentation: SegmentationProvider | None = None,
+) -> AnalyzedView:
     try:
         with Image.open(BytesIO(data)) as source:
             image = ImageOps.exif_transpose(source).convert("RGB")
@@ -165,6 +171,25 @@ def analyze_image(name: str, data: bytes) -> AnalyzedView:
         raise ImageSetRejected(
             f"No clear furniture-sized foreground object was found in the {name} view"
         )
+    seed_indices = [index for index, value in enumerate(mask) if value]
+    seed_xs = [index % width for index in seed_indices]
+    seed_ys = [index // width for index in seed_indices]
+    seed_bbox = (min(seed_xs), min(seed_ys), max(seed_xs) + 1, max(seed_ys) + 1)
+    if segmentation is not None:
+        seed_mask = bytes(mask)
+        refined = segmentation.refine_mask(image, seed_mask, seed_bbox)
+        if len(refined) != width * height:
+            raise ImageSetRejected(
+                f"The segmentation provider returned an invalid {name} mask"
+            )
+        if refined != seed_mask:
+            mask, object_pixels = _largest_component(
+                _clean_mask(bytearray(refined), width, height), width, height
+            )
+            if object_pixels < width * height * 0.012:
+                raise ImageSetRejected(
+                    f"No clear furniture-sized foreground object was found in the {name} view"
+                )
     indices = [index for index, value in enumerate(mask) if value]
     xs = [index % width for index in indices]
     ys = [index // width for index in indices]

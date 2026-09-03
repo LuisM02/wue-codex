@@ -548,6 +548,12 @@ def reconstruct(
     height: float,
     depth: float,
     input_warnings: list[str],
+    provider_name: str = "wue-five-view-silhouette",
+    provider_version: str = "0.2.0",
+    pipeline_warning: str = (
+        "This local pipeline traces real silhouettes but does not yet run SAM 2 "
+        "or dense multi-view depth"
+    ),
 ) -> ReconstructionResponse:
     builders = {
         "chair": _chair,
@@ -560,11 +566,11 @@ def reconstruct(
     ) / len(views)
     confidence = min(0.72, max(0.35, quality * 0.68))
     return ReconstructionResponse(
-        provider_name="wue-five-view-silhouette",
-        provider_version="0.1.0",
+        provider_name=provider_name,
+        provider_version=provider_version,
         confidence=round(confidence, 3),
         warnings=[
-            "This first local pipeline traces real silhouettes but does not yet run SAM 2 or dense multi-view depth",
+            pipeline_warning,
             *input_warnings,
             *warnings,
         ],

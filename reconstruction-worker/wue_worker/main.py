@@ -6,7 +6,7 @@ import hashlib
 import json
 from typing import Annotated
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 
 from . import __version__
 from .geometry import classify as classify_views
@@ -18,12 +18,19 @@ from .schemas import (
     ReconstructionResponse,
     WorkerHealth,
 )
+from .segmentation import (
+    SegmentationProvider,
+    SegmentationUnavailable,
+    get_segmentation_provider,
+)
 
 app = FastAPI(title="WUE local vision worker", version=__version__)
 
 
 async def _read_views(
-    files: dict[str, UploadFile], manifest_json: str
+    files: dict[str, UploadFile],
+    manifest_json: str,
+    segmentation: SegmentationProvider,
 ) -> dict:
     try:
         manifest_items = json.loads(manifest_json)
@@ -47,10 +54,17 @@ async def _read_views(
                 raise ImageSetRejected(
                     f"The {name} image checksum does not match its manifest"
                 )
-            analyzed[name] = analyze_image(name, data)
+            analyzed[name] = analyze_image(name, data, segmentation)
     except ImageSetRejected as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except SegmentationUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     return analyzed
+
+
+SegmentationDependency = Annotated[
+    SegmentationProvider, Depends(get_segmentation_provider)
+]
 
 
 @app.get("/health", response_model=WorkerHealth)
@@ -59,17 +73,14 @@ def health() -> WorkerHealth:
 
 
 @app.get("/v1/model-status", response_model=ModelStatus)
-def model_status() -> ModelStatus:
+def model_status(segmentation: SegmentationDependency) -> ModelStatus:
+    status = segmentation.status
     return ModelStatus(
-        ready=True,
-        pipeline="five-view-silhouette-baseline",
-        uses_gpu=False,
-        loaded_checkpoints=[],
-        limitations=[
-            "Best with one furniture item against a plain contrasting background",
-            "Semantic parts are inferred from traced silhouettes",
-            "SAM 2 and dense multi-view depth are not loaded in this baseline",
-        ],
+        ready=status.ready,
+        pipeline=status.pipeline,
+        uses_gpu=status.uses_gpu,
+        loaded_checkpoints=list(status.loaded_checkpoints),
+        limitations=list(status.limitations),
     )
 
 
@@ -81,6 +92,7 @@ async def classify(
     left: Annotated[UploadFile, File()],
     right: Annotated[UploadFile, File()],
     top: Annotated[UploadFile, File()],
+    segmentation: SegmentationDependency,
 ) -> ClassificationResponse:
     views = await _read_views(
         {
@@ -91,6 +103,7 @@ async def classify(
             "top": top,
         },
         image_manifest,
+        segmentation,
     )
     try:
         validate_view_set(views)
@@ -99,8 +112,8 @@ async def classify(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return ClassificationResponse(
         furniture_type=furniture_type,
-        classifier_name="wue-image-structure",
-        classifier_version=__version__,
+        classifier_name=segmentation.classifier_name,
+        classifier_version=segmentation.provider_version,
         confidence=confidence,
     )
 
@@ -119,6 +132,7 @@ async def reconstruct(
     left: Annotated[UploadFile, File()],
     right: Annotated[UploadFile, File()],
     top: Annotated[UploadFile, File()],
+    segmentation: SegmentationDependency,
 ) -> ReconstructionResponse:
     views = await _read_views(
         {
@@ -129,6 +143,7 @@ async def reconstruct(
             "top": top,
         },
         image_manifest,
+        segmentation,
     )
     try:
         warnings = validate_view_set(
@@ -141,6 +156,9 @@ async def reconstruct(
             height_mm,
             depth_mm,
             warnings,
+            provider_name=segmentation.provider_name,
+            provider_version=segmentation.provider_version,
+            pipeline_warning=segmentation.reconstruction_warning,
         )
     except (ImageSetRejected, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

@@ -10,6 +10,11 @@ from fastapi.testclient import TestClient
 from PIL import Image, ImageDraw
 
 from wue_worker.main import app
+from wue_worker.segmentation import (
+    BaselineSegmentationProvider,
+    SegmentationStatus,
+    get_segmentation_provider,
+)
 
 VIEWS = ("front", "back", "left", "right", "top")
 
@@ -20,7 +25,25 @@ def client() -> Generator[TestClient, None, None]:
     try:
         yield test_client
     finally:
+        app.dependency_overrides.clear()
         test_client.close()
+
+
+class FakeNeuralSegmentation(BaselineSegmentationProvider):
+    provider_name = "test-sam2-segmenter"
+    provider_version = "test-checkpoint"
+    classifier_name = "test-classifier+sam2"
+    reconstruction_warning = "Test neural outline; dense depth is not loaded"
+
+    @property
+    def status(self) -> SegmentationStatus:
+        return SegmentationStatus(
+            ready=True,
+            pipeline="test-sam2-pipeline",
+            uses_gpu=True,
+            loaded_checkpoints=("test-sam2.pt",),
+            limitations=("Dense depth is not loaded",),
+        )
 
 
 def _chair_image(view: str, *, variant: int = 0) -> bytes:
@@ -127,12 +150,70 @@ def _files_for(factory) -> tuple[dict, list[dict[str, str]]]:
 
 
 def test_health_and_model_status_are_honest(client: TestClient) -> None:
-    assert client.get("/health").json()["version"] == "0.1.0"
+    assert client.get("/health").json()["version"] == "0.2.0"
     status = client.get("/v1/model-status").json()
     assert status["ready"] is True
     assert status["uses_gpu"] is False
     assert status["loaded_checkpoints"] == []
     assert "silhouette" in status["pipeline"]
+
+
+def test_selected_segmenter_drives_status_and_provenance(
+    client: TestClient,
+) -> None:
+    app.dependency_overrides[get_segmentation_provider] = FakeNeuralSegmentation
+
+    status = client.get("/v1/model-status").json()
+    assert status == {
+        "ready": True,
+        "pipeline": "test-sam2-pipeline",
+        "uses_gpu": True,
+        "loaded_checkpoints": ["test-sam2.pt"],
+        "limitations": ["Dense depth is not loaded"],
+    }
+
+    files, manifest = _payload()
+    response = client.post(
+        "/v1/reconstruct",
+        files=files,
+        data={
+            "furniture_type": "chair",
+            "width_mm": "520",
+            "height_mm": "900",
+            "depth_mm": "560",
+            "image_manifest": json.dumps(manifest),
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["provider_name"] == "test-sam2-segmenter"
+    assert body["provider_version"] == "test-checkpoint"
+    assert body["warnings"][0] == "Test neural outline; dense depth is not loaded"
+
+
+def test_sam2_configuration_without_checkpoint_refuses_inference(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("WUE_WORKER_SEGMENTATION_PROVIDER", "sam2")
+    monkeypatch.delenv("WUE_SAM2_CHECKPOINT", raising=False)
+    get_segmentation_provider.cache_clear()
+    try:
+        status = client.get("/v1/model-status").json()
+        assert status["ready"] is False
+        assert status["loaded_checkpoints"] == []
+        assert "WUE_SAM2_CHECKPOINT" in status["limitations"][0]
+
+        files, manifest = _payload()
+        response = client.post(
+            "/v1/classify",
+            files=files,
+            data={"image_manifest": json.dumps(manifest)},
+        )
+        assert response.status_code == 503
+        assert "configured but unavailable" in response.json()["detail"]
+    finally:
+        get_segmentation_provider.cache_clear()
 
 
 def test_worker_classifies_and_reconstructs_a_photo_derived_chair(
