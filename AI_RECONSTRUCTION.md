@@ -53,10 +53,10 @@ Do not train a 3D foundation model from scratch. Start with pretrained reconstru
 
 ## Implemented local baseline worker
 
-`reconstruction-worker/` now supplies health/model-status, five-view classification, and reconstruction endpoints. It rejects duplicate files, incoherent opposite views, unusable silhouettes, checksum mismatches, and strongly mismatched view orientation. With a plain contrasting background it traces the actual visible silhouette into part profiles, fits front geometry to side-view depth, and returns explicit low-confidence warnings for hidden surfaces. Regression coverage proves visibly different chair silhouettes produce different editable profiles.
+`reconstruction-worker/` now supplies health/model-status, five-view classification, and reconstruction endpoints. It rejects duplicate files, incoherent opposite views, unusable silhouettes, checksum mismatches, and strongly mismatched view orientation. Its verified SAM 2.1 Base Plus path runs on the RTX 4070, replaces the baseline foreground extraction with neural masks, and records the checkpoint hash. It then traces the actual visible silhouette into part profiles, fits front geometry to side-view depth, and returns explicit low-confidence warnings for hidden surfaces. Regression coverage proves visibly different chair silhouettes produce different editable profiles.
 
-This baseline deliberately identifies itself as `wue-five-view-silhouette`; it is not presented as the final neural system and does not claim GPU use. Configure both backend HTTP providers to use it. This makes the full workflow runnable while preserving an honest model-status response.
+The baseline still identifies itself as `wue-five-view-silhouette` and does not claim GPU use. The configured neural path identifies itself as `wue-sam2.1-five-view`, reports CUDA use, and includes the checkpoint digest in its provenance. Both preserve an honest model-status response.
 
 ## Next implementation increment
 
-Replace the worker's foreground segmenter with an approved SAM 2 checkpoint and add pose-free dense multi-view geometry in its own Python/CUDA environment. Then evaluate chair, table, and bookshelf photo sets against measured reference geometry before raising confidence or enabling it by default. The saved reconstruction contract does not need to change.
+Add a commercially suitable pose-free dense multi-view geometry provider in the isolated Python/CUDA environment, followed by neural furniture-part proposals and cross-view fitting. Then evaluate chair, table, and bookshelf photo sets against measured reference geometry before raising confidence. The saved reconstruction contract does not need to change.

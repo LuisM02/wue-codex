@@ -48,11 +48,10 @@ Set-Location backend
 uvicorn app.main:app --reload
 ```
 
-To use automatic recognition and the current photo-derived baseline, first run the isolated worker in another terminal:
+To use automatic recognition and the SAM 2.1 photo segmentation path, first run the isolated worker in another PowerShell window:
 
 ```powershell
-Set-Location reconstruction-worker
-..\.venv\Scripts\python.exe -m uvicorn wue_worker.main:app --host 127.0.0.1 --port 8010
+.\scripts\start-sam2-worker.ps1
 ```
 
 Then set `WUE_CLASSIFICATION_PROVIDER=http` and `WUE_RECONSTRUCTION_PROVIDER=http` before starting the API. Both service URLs default to `http://127.0.0.1:8010`. Leave either provider as `unconfigured` when an unavailable worker should produce an explicit 503 instead of a fallback result.
@@ -94,7 +93,7 @@ Photo reconstruction endpoints are:
 
 Each part records which source views support it, confidence, dimensions, 3-axis pose, and either a bounded box or an editable front-facing polygon profile. Changing an image, recognized type, or unlocked dimension set invalidates the proposal. The default reconstruction adapter returns HTTP 503 with an explicit message that WUE will not generate a generic substitute. Set `WUE_RECONSTRUCTION_PROVIDER=http` to use the isolated local service at `WUE_RECONSTRUCTION_SERVICE_URL`; the service receives five multipart image fields plus scale and checksum metadata. Large model dependencies and checkpoints do not run inside the business API.
 
-The runnable worker under `reconstruction-worker/` is the first photo-derived baseline. It checks that all five files are distinct, compares opposite views, rejects obvious orientation errors or unusable backgrounds, detects the furniture class from image structure, traces visible part silhouettes, and uses a side view for depth. Its model-status endpoint clearly reports that it is CPU silhouette analysis—not SAM 2 or dense neural multi-view reconstruction—and its returned warnings keep hidden geometry visibly provisional. Start it on port 8010, then set both classification and reconstruction providers to `http`.
+The worker under `reconstruction-worker/` supports the dependency-light photo-derived baseline and a verified SAM 2.1 Base Plus segmentation path on the RTX 4070 through WSL. It checks that all five files are distinct, compares opposite views, rejects obvious orientation errors, records the loaded checkpoint hash, traces visible part silhouettes, and uses a side view for depth. Dense neural multi-view geometry and trained furniture-part recognition are still separate later stages, so hidden geometry remains visibly provisional. Start it on port 8010, then set both classification and reconstruction providers to `http`.
 
 Overall dimension endpoints are:
 

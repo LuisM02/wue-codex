@@ -218,7 +218,7 @@ class Sam2SegmentationProvider:
                 stack.enter_context(torch.inference_mode())
                 if self._device() == "cuda":
                     stack.enter_context(torch.autocast("cuda", dtype=torch.bfloat16))
-                predictor.set_image(np.asarray(image))
+                predictor.set_image(np.array(image, copy=True))
                 masks, scores, _ = predictor.predict(
                     box=np.asarray(seed_bbox, dtype=np.float32),
                     multimask_output=True,
