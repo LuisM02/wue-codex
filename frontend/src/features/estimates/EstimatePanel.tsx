@@ -5,6 +5,7 @@ import { isWoodScrewMaterial } from "../../lib/catalog";
 import { formatDate, formatNumber, unitLabel } from "../../lib/format";
 import { api } from "../../services/apiClient";
 import type {
+  BomSelection,
   CompleteCost,
   CostSelection,
   Furniture,
@@ -20,14 +21,15 @@ import type {
 interface Props {
   furniture: Furniture;
   plan: FurniturePlan;
+  initialSelection: BomSelection | null;
 }
 
-export function EstimatePanel({ furniture, plan }: Props) {
+export function EstimatePanel({ furniture, plan, initialSelection }: Props) {
   const [woods, setWoods] = useState<Material[]>([]);
   const [hardware, setHardware] = useState<Material[]>([]);
   const [laborRates, setLaborRates] = useState<LaborRate[]>([]);
-  const [woodId, setWoodId] = useState("");
-  const [hardwareId, setHardwareId] = useState("");
+  const [woodId, setWoodId] = useState(initialSelection?.material_id ?? "");
+  const [hardwareId, setHardwareId] = useState(initialSelection?.hardware_material_id ?? "");
   const [laborRateId, setLaborRateId] = useState("");
   const [materialQuantity, setMaterialQuantity] = useState<MaterialQuantity | null>(null);
   const [hardwareQuantity, setHardwareQuantity] = useState<HardwareQuantity | null>(null);
@@ -35,6 +37,9 @@ export function EstimatePanel({ furniture, plan }: Props) {
   const [estimate, setEstimate] = useState<CompleteCost | null>(null);
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [busy, setBusy] = useState<string | null>("load");
+  const [laborSetupBusy, setLaborSetupBusy] = useState(false);
+  const [laborName, setLaborName] = useState("Standard workshop rate");
+  const [laborPrice, setLaborPrice] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -102,11 +107,31 @@ export function EstimatePanel({ furniture, plan }: Props) {
     }
   }
 
+  async function createStarterLaborRate() {
+    const parsedPrice = Number(laborPrice);
+    if (!laborName.trim() || !laborPrice.trim() || parsedPrice < 0 || !Number.isFinite(parsedPrice)) return;
+    setLaborSetupBusy(true);
+    setError(null);
+    try {
+      const rate = await api.catalog.createLaborRate({ rate_name: laborName.trim(), is_active: true });
+      await api.catalog.createLaborRatePrice(rate.id, {
+        rate_per_hour: parsedPrice,
+        effective_date: new Date().toISOString().slice(0, 10),
+      });
+      setLaborRates([rate]);
+      setLaborRateId(rate.id);
+    } catch (reason) {
+      setError((reason as Error).message);
+    } finally {
+      setLaborSetupBusy(false);
+    }
+  }
+
   const catalogReady = woods.length > 0 && hardware.length > 0 && laborRates.length > 0;
 
   return (
     <section className="workspace-section workspace-section--wide estimate-workspace">
-      <SectionHeading eyebrow="Step 06 · Transparent costing" title="Build the final estimate">
+      <SectionHeading eyebrow="Step 07 · Transparent costing" title="Build the final estimate">
         <span className="status-badge status-badge--finalized">Plan revision {plan.revision}</span>
       </SectionHeading>
       <p className="section-intro">
@@ -117,6 +142,21 @@ export function EstimatePanel({ furniture, plan }: Props) {
         <Notice tone="warning">
           The pricing catalog needs at least one active wood material, an active hardware item named “Wood screw,” and one labor rate—with dated prices—before a complete estimate can be calculated.
         </Notice>
+      )}
+      {!laborRates.length && busy !== "load" && (
+        <div className="panel catalog-setup">
+          <div className="panel__heading">
+            <span className="panel__index">+</span>
+            <div><h3>Set up a labor rate</h3><p>Use your workshop’s actual hourly rate. It remains editable through the local catalog.</p></div>
+          </div>
+          <div className="catalog-setup__fields catalog-setup__fields--labor">
+            <label className="field"><span>Rate name</span><input value={laborName} onChange={(event) => setLaborName(event.target.value)} /></label>
+            <label className="field"><span>Price per hour</span><input type="number" min="0" step="0.01" value={laborPrice} onChange={(event) => setLaborPrice(event.target.value)} placeholder="0.00" /></label>
+            <button className="button button--primary" type="button" disabled={laborSetupBusy || !laborName.trim() || !laborPrice.trim()} onClick={createStarterLaborRate}>
+              {laborSetupBusy ? <BusyLabel>Saving rate…</BusyLabel> : "Save labor rate"}
+            </button>
+          </div>
+        </div>
       )}
 
       <div className="quantity-ribbon">

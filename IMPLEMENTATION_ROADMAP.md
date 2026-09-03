@@ -2,7 +2,7 @@
 
 Work proceeds in small, tested modules. Each module receives focused service tests, API tests where relevant, a full regression run, and a clean commit before the next module begins.
 
-Current status: Modules 1 through 17, the parametric CAD editor, Module 18A, Module 18B1, and Modules 19A through 19C complete. Version 0.20.0 is the verified pre-neural-inference baseline.
+Current status: Modules 1 through 17, the parametric CAD editor, Module 18A, Module 18B1, Modules 19A through 19C, and Module 20 complete. Version 0.20.0 is the verified pre-neural-inference baseline.
 
 1. **Backend foundation (complete)** — FastAPI application factory, environment settings, PostgreSQL/SQLAlchemy session architecture, health endpoints, pytest setup, and project documentation.
 2. **Projects and furniture (complete)** — UUID-backed project and furniture models plus CRUD APIs constrained to chair, dining table, and bookshelf.
@@ -31,3 +31,4 @@ Current status: Modules 1 through 17, the parametric CAD editor, Module 18A, Mod
     - **19A — isolated real PostgreSQL verification (complete):** each integration session creates, migrates, tests, and removes a uniquely named disposable database, so retained rows in a shared test database cannot contaminate results. The complete 333-test backend suite passes on PostgreSQL 18.
     - **19B — contract and accessibility hardening (complete):** a shared manifest is exercised by every frontend API method and checked against FastAPI OpenAPI; expected optional 404s remain quiet while genuine partial-load failures identify the affected resource. CAD toolbar/toggle/status semantics and keyboard-only selection were verified in the live app.
     - **19C — release regression (complete):** version 0.20.0 passes all 333 backend tests on PostgreSQL 18, all 5 reconstruction-worker tests, all 25 frontend tests, the optimized production build, and a live browser workflow/accessibility check with no console errors.
+20. **BOM-first costing workflow (complete)** — a dedicated post-3D bill of materials separates engineering quantities from the commercial quote, shows material and hardware summaries plus a per-part audit, carries selected purchasing stock into quotation costing, and provides first-run local wood, screw, and labor price setup without inventing market prices.

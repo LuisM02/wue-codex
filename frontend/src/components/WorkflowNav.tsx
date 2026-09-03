@@ -1,4 +1,4 @@
-import { completedSteps, workflowSteps, type WorkflowContext, type WorkflowStepId } from "../lib/workflow";
+import { canOpenStep, completedSteps, workflowSteps, type WorkflowContext, type WorkflowStepId } from "../lib/workflow";
 
 export function WorkflowNav({
   active,
@@ -10,19 +10,13 @@ export function WorkflowNav({
   onSelect: (step: WorkflowStepId) => void;
 }) {
   const completed = completedSteps(context);
-  const furniture = context.furniture;
 
   return (
     <nav className="workflow-nav" aria-label="Reconstruction steps">
       {workflowSteps.map((step) => {
         const isActive = active === step.id;
         const isComplete = completed.has(step.id);
-        const canVisit = step.id === "project" || Boolean(furniture) && (
-          step.id === "photos" ||
-          (step.id === "dimensions" && context.images.length === 5 && Boolean(furniture?.furniture_type)) ||
-          (step.id === "plan" && Boolean(context.dimensions)) ||
-          ((step.id === "model" || step.id === "estimate") && context.plan?.status === "finalized")
-        );
+        const canVisit = canOpenStep(step.id, context);
         return (
           <button
             key={step.id}

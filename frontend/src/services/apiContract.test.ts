@@ -19,6 +19,8 @@ function canonicalPath(rawPath: string): string {
     .replaceAll("furniture-id", "{furniture_id}")
     .replaceAll("plan-id", "{plan_id}")
     .replaceAll("component-id", "{component_id}")
+    .replaceAll("material-id", "{material_id}")
+    .replaceAll("rate-id", "{labor_rate_id}")
     .replace(/\/images\/front(?=\/|$)/, "/images/{view}");
 }
 
@@ -80,8 +82,14 @@ describe("frontend/backend API route contract", () => {
       api.plans.materialQuantity("plan-id"),
       api.plans.hardwareQuantity("plan-id"),
       api.plans.laborQuantity("plan-id"),
+      api.plans.materialCost("plan-id", "wood"),
+      api.plans.hardwareCost("plan-id", "screw"),
       api.catalog.materials("wood"),
+      api.catalog.createMaterial({ material_name: "Wood", material_type: "wood", unit: "board_ft", is_active: true }),
+      api.catalog.createMaterialPrice("material-id", { price_per_unit: 1, effective_date: "2026-09-03" }),
       api.catalog.laborRates(),
+      api.catalog.createLaborRate({ rate_name: "Standard", is_active: true }),
+      api.catalog.createLaborRatePrice("rate-id", { rate_per_hour: 1, effective_date: "2026-09-03" }),
       api.estimates.complete("plan-id", { material_id: "wood", hardware_material_id: "screw", labor_rate_id: "rate" }),
       api.estimates.listQuotations("plan-id"),
       api.estimates.createQuotation("plan-id", { material_id: "wood", hardware_material_id: "screw", labor_rate_id: "rate" }),

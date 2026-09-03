@@ -1,7 +1,8 @@
 import type {
-  CompleteCost, CostSelection, Furniture, FurnitureClassification, FurnitureDimensions, FurnitureReconstruction,
-  FurnitureImage, FurniturePlan, FurnitureType, HardwareQuantity, ImageView, LaborQuantity,
-  LaborRate, Material, MaterialQuantity, PlanComponent, PlanComponentPayload, PlanGeometry, Project, Quotation, UUID,
+  BomHardwareCost, BomMaterialCost, CompleteCost, CostSelection, Furniture, FurnitureClassification,
+  FurnitureDimensions, FurnitureReconstruction, FurnitureImage, FurniturePlan, FurnitureType,
+  HardwareQuantity, ImageView, LaborQuantity,
+  LaborRate, Material, MaterialQuantity, MaterialUnit, PlanComponent, PlanComponentPayload, PlanGeometry, Project, Quotation, UUID,
 } from "../types/api";
 
 const API_ROOT = "/api/v1";
@@ -101,11 +102,23 @@ export const api = {
     materialQuantity: (planId: UUID) => request<MaterialQuantity>(`/plans/${planId}/material-quantity`),
     hardwareQuantity: (planId: UUID) => request<HardwareQuantity>(`/plans/${planId}/hardware-quantity`),
     laborQuantity: (planId: UUID) => request<LaborQuantity>(`/plans/${planId}/labor-quantity`),
+    materialCost: (planId: UUID, materialId: UUID) =>
+      request<BomMaterialCost>(`/plans/${planId}/material-cost?${queryString({ material_id: materialId })}`),
+    hardwareCost: (planId: UUID, materialId: UUID) =>
+      request<BomHardwareCost>(`/plans/${planId}/hardware-cost?${queryString({ material_id: materialId })}`),
   },
   catalog: {
     materials: (type: "wood" | "hardware") =>
       request<Material[]>(`/admin/materials?${queryString({ material_type: type, is_active: "true" })}`),
+    createMaterial: (payload: { material_name: string; material_type: "wood" | "hardware"; unit: MaterialUnit; is_active: boolean }) =>
+      request<Material>("/admin/materials", { method: "POST", body: JSON.stringify(payload) }),
+    createMaterialPrice: (materialId: UUID, payload: { price_per_unit: number; effective_date: string }) =>
+      request<void>(`/admin/materials/${materialId}/prices`, { method: "POST", body: JSON.stringify(payload) }),
     laborRates: () => request<LaborRate[]>("/admin/labor-rates?is_active=true"),
+    createLaborRate: (payload: { rate_name: string; is_active: boolean }) =>
+      request<LaborRate>("/admin/labor-rates", { method: "POST", body: JSON.stringify(payload) }),
+    createLaborRatePrice: (laborRateId: UUID, payload: { rate_per_hour: number; effective_date: string }) =>
+      request<void>(`/admin/labor-rates/${laborRateId}/prices`, { method: "POST", body: JSON.stringify(payload) }),
   },
   estimates: {
     complete: (planId: UUID, selection: CostSelection) =>

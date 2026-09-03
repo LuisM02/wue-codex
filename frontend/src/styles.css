@@ -484,6 +484,29 @@ h1, h2, h3, strong, .button { font-family: "Manrope", "DM Sans", sans-serif; }
 .quantity-ribbon article > div { display: grid; }
 .quantity-ribbon small { color: var(--muted); font-size: 8px; text-transform: uppercase; letter-spacing: .08em; }
 .quantity-ribbon strong { margin-top: 3px; font-size: 11px; }
+.bom-workspace { padding-bottom: 70px; }
+.catalog-setup { margin-bottom: 18px; border-color: #d6bb81; background: #fffaf0; box-shadow: none; }
+.catalog-setup__fields { display: grid; grid-template-columns: 1.2fr 1fr 1fr auto; align-items: end; gap: 12px; }
+.catalog-setup__fields--labor { grid-template-columns: 1.2fr 1fr auto; }
+.catalog-setup__fields .button { min-height: 43px; }
+.bom-selection-panel { margin-bottom: 18px; box-shadow: none; }
+.bom-selectors { display: grid; grid-template-columns: 1fr 1fr .75fr; align-items: end; gap: 15px; }
+.bom-running-total { min-height: 68px; display: grid; align-content: center; padding: 11px 15px; border-radius: 9px; background: var(--forest-dark); color: white; }
+.bom-running-total small { color: #b9c9bd; font-size: 8px; text-transform: uppercase; letter-spacing: .09em; }
+.bom-running-total strong { margin: 3px 0; color: #f2d7a6; font-size: 20px; }
+.bom-running-total span { color: #aebdb1; font-size: 7px; }
+.bom-section { margin-top: 17px; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.bom-section > header { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 16px 18px 13px; border-bottom: 1px solid var(--line); }
+.bom-section > header h3 { margin-top: 4px; font-size: 13px; }
+.bom-table-wrap { overflow-x: auto; }
+.bom-table { width: 100%; min-width: 720px; border-collapse: collapse; text-align: left; }
+.bom-table th { padding: 9px 14px; background: #ebe8df; color: var(--muted); font-size: 7px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.bom-table td { padding: 13px 14px; border-top: 1px solid #e6e0d5; color: #5f635f; font-size: 9px; }
+.bom-table tbody tr:first-child td { border-top: 0; }
+.bom-table td strong { color: var(--ink); font-size: 10px; }
+.bom-table td:last-child, .bom-table th:last-child { text-align: right; }
+.bom-table--parts td:nth-child(3) { white-space: nowrap; }
+.bom-price-note { margin: 0; padding: 9px 14px; border-top: 1px solid var(--line); background: #f7f4ed; color: var(--muted); font-size: 7px; }
 .estimate-layout { display: grid; grid-template-columns: .8fr 1.2fr; gap: 17px; }
 .estimate-builder { box-shadow: none; }
 .estimate-builder .field + .field { margin-top: 13px; }
@@ -583,6 +606,8 @@ h1, h2, h3, strong, .button { font-family: "Manrope", "DM Sans", sans-serif; }
   .viewer-stage, .viewer-stage canvas { min-height: 480px; }
   .viewer-sidebar { grid-template-columns: 1fr 1fr; }
   .quantity-ribbon { grid-template-columns: 1fr; }
+  .bom-selectors { grid-template-columns: 1fr; }
+  .catalog-setup__fields, .catalog-setup__fields--labor { grid-template-columns: 1fr; }
   .quotation-list { grid-template-columns: 1fr; }
   .furniture-cad { overflow-x: auto; }
   .cad-toolbar { min-width: 760px; }

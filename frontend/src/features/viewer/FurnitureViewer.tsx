@@ -191,7 +191,7 @@ export function FurnitureViewer({ furniture, plan, onContinue }: Props) {
 
       <div className="section-footer">
         <div><small>Appearance</small><strong>{finish.name} preview · not linked to pricing</strong></div>
-        <button className="button button--primary" disabled={!geometry} onClick={onContinue}>Build estimate <span>→</span></button>
+        <button className="button button--primary" disabled={!geometry} onClick={onContinue}>Review bill of materials <span>→</span></button>
       </div>
     </section>
   );

@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 
 import { BusyLabel, Notice } from "./components/Feedback";
 import { WorkflowNav } from "./components/WorkflowNav";
+import { BomPanel } from "./features/bom/BomPanel";
 import { DimensionsForm } from "./features/dimensions/DimensionsForm";
 import { EstimatePanel } from "./features/estimates/EstimatePanel";
 import { ImageWorkspace } from "./features/images/ImageWorkspace";
@@ -12,6 +13,7 @@ import { settledFailureMessage } from "./lib/loadState";
 import { canOpenStep, type WorkflowContext, type WorkflowStepId } from "./lib/workflow";
 import { api } from "./services/apiClient";
 import type {
+  BomSelection,
   Furniture,
   FurnitureClassification,
   FurnitureDimensions,
@@ -34,6 +36,7 @@ export default function App() {
   const [classification, setClassification] = useState<FurnitureClassification | null>(null);
   const [dimensions, setDimensions] = useState<FurnitureDimensions | null>(null);
   const [plan, setPlan] = useState<FurniturePlan | null>(null);
+  const [bomSelection, setBomSelection] = useState<BomSelection | null>(null);
   const [step, setStep] = useState<WorkflowStepId>("project");
   const [loading, setLoading] = useState(true);
   const [loadingPiece, setLoadingPiece] = useState(false);
@@ -53,6 +56,7 @@ export default function App() {
     setClassification(null);
     setDimensions(null);
     setPlan(null);
+    setBomSelection(null);
     if (!furniture) return;
     let current = true;
     setError(null);
@@ -81,13 +85,18 @@ export default function App() {
     return () => { current = false; };
   }, [furniture]);
 
+  useEffect(() => {
+    setBomSelection(null);
+  }, [plan?.id]);
+
   const context = useMemo<WorkflowContext>(() => ({
     project,
     furniture,
     images,
     dimensions,
     plan,
-  }), [project, furniture, images, dimensions, plan]);
+    bomSelection,
+  }), [project, furniture, images, dimensions, plan, bomSelection]);
 
   function changeProject(value: Project | null) {
     setError(null);
@@ -195,11 +204,22 @@ export default function App() {
         )}
         {step === "model" && furniture && plan?.status === "finalized" && (
           <Suspense fallback={<div className="piece-loading"><BusyLabel>Opening 3D studio…</BusyLabel></div>}>
-            <FurnitureViewer furniture={furniture} plan={plan} onContinue={() => visit("estimate")} />
+            <FurnitureViewer furniture={furniture} plan={plan} onContinue={() => visit("bom")} />
           </Suspense>
         )}
+        {step === "bom" && furniture && plan?.status === "finalized" && (
+          <BomPanel
+            furniture={furniture}
+            plan={plan}
+            initialSelection={bomSelection}
+            onContinue={(selection) => {
+              setBomSelection(selection);
+              setStep("estimate");
+            }}
+          />
+        )}
         {step === "estimate" && furniture && plan?.status === "finalized" && (
-          <EstimatePanel furniture={furniture} plan={plan} />
+          <EstimatePanel furniture={furniture} plan={plan} initialSelection={bomSelection} />
         )}
       </main>
     </div>

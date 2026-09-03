@@ -6,7 +6,7 @@ const project = { id: "p", name: "Project", description: null, created_at: "", u
 const furniture = { id: "f", project_id: "p", name: "Chair", furniture_type: "chair" as const, created_at: "", updated_at: "" };
 
 function context(overrides: Partial<WorkflowContext> = {}): WorkflowContext {
-  return { project: null, furniture: null, images: [], dimensions: null, plan: null, ...overrides };
+  return { project: null, furniture: null, images: [], dimensions: null, plan: null, bomSelection: null, ...overrides };
 }
 
 describe("workflow access", () => {
@@ -39,7 +39,7 @@ describe("workflow access", () => {
     expect(canOpenStep("dimensions", { ...base, images })).toBe(true);
   });
 
-  it("opens preview and costing only for a finalized plan", () => {
+  it("opens preview and BOM for a finalized plan, then costing after BOM selection", () => {
     const draft = context({ project, furniture, plan: {
       id: "plan", furniture_id: "f", revision: 1, status: "draft", furniture_type: "chair", source_reconstruction_id: null,
       components: [], created_at: "", updated_at: "",
@@ -47,8 +47,15 @@ describe("workflow access", () => {
     expect(canOpenStep("model", draft)).toBe(false);
     const finalized = { ...draft, plan: { ...draft.plan!, status: "finalized" as const } };
     expect(canOpenStep("model", finalized)).toBe(true);
-    expect(canOpenStep("estimate", finalized)).toBe(true);
+    expect(canOpenStep("bom", finalized)).toBe(true);
+    expect(canOpenStep("estimate", finalized)).toBe(false);
     expect(completedSteps(finalized)).toEqual(new Set(["project", "plan", "model"]));
+    const reviewed = {
+      ...finalized,
+      bomSelection: { material_id: "wood", hardware_material_id: "screw" },
+    };
+    expect(canOpenStep("estimate", reviewed)).toBe(true);
+    expect(completedSteps(reviewed)).toEqual(new Set(["project", "plan", "model", "bom"]));
   });
 
   it("returns the next unlocked step", () => {

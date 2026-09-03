@@ -1,4 +1,5 @@
 import type {
+  BomSelection,
   Furniture,
   FurnitureDimensions,
   FurnitureImage,
@@ -6,7 +7,7 @@ import type {
   Project,
 } from "../types/api";
 
-export type WorkflowStepId = "project" | "photos" | "dimensions" | "plan" | "model" | "estimate";
+export type WorkflowStepId = "project" | "photos" | "dimensions" | "plan" | "model" | "bom" | "estimate";
 
 export interface WorkflowContext {
   project: Project | null;
@@ -14,6 +15,7 @@ export interface WorkflowContext {
   images: FurnitureImage[];
   dimensions: FurnitureDimensions | null;
   plan: FurniturePlan | null;
+  bomSelection: BomSelection | null;
 }
 
 export const workflowSteps: Array<{ id: WorkflowStepId; number: string; label: string; hint: string }> = [
@@ -22,7 +24,8 @@ export const workflowSteps: Array<{ id: WorkflowStepId; number: string; label: s
   { id: "dimensions", number: "03", label: "Measure", hint: "Set overall size" },
   { id: "plan", number: "04", label: "Plan", hint: "Review the parts" },
   { id: "model", number: "05", label: "Preview", hint: "Inspect in 3D" },
-  { id: "estimate", number: "06", label: "Quote", hint: "Price the build" },
+  { id: "bom", number: "06", label: "BOM", hint: "Review materials" },
+  { id: "estimate", number: "07", label: "Quote", hint: "Price the build" },
 ];
 
 export function completedSteps(context: WorkflowContext): Set<WorkflowStepId> {
@@ -34,6 +37,7 @@ export function completedSteps(context: WorkflowContext): Set<WorkflowStepId> {
     completed.add("plan");
     completed.add("model");
   }
+  if (context.bomSelection) completed.add("bom");
   return completed;
 }
 
@@ -43,7 +47,8 @@ export function canOpenStep(step: WorkflowStepId, context: WorkflowContext): boo
   if (step === "photos") return true;
   if (step === "dimensions") return context.images.length === 5 && Boolean(context.furniture.furniture_type);
   if (step === "plan") return Boolean(context.dimensions);
-  return context.plan?.status === "finalized";
+  if (step === "model" || step === "bom") return context.plan?.status === "finalized";
+  return context.plan?.status === "finalized" && Boolean(context.bomSelection);
 }
 
 export function nextStep(current: WorkflowStepId, context: WorkflowContext): WorkflowStepId {

@@ -216,22 +216,81 @@ export interface LaborRate {
 
 export interface MaterialQuantity {
   plan_id: UUID;
+  furniture_id: UUID;
+  revision: number;
+  furniture_type: FurnitureType;
   total_volume_mm3: DecimalString;
   unit: "mm3";
   components: Array<{
     source_component_id: UUID;
     component_name: string;
+    component_type: ComponentType;
+    width_mm: DecimalString;
+    height_mm: DecimalString;
+    depth_mm: DecimalString;
+    depth_source: "component_depth" | "thickness";
+    single_piece_volume_mm3: DecimalString;
     total_volume_mm3: DecimalString;
     quantity: number;
+    sort_order: number;
   }>;
 }
 
 export interface HardwareQuantity {
   plan_id: UUID;
+  furniture_id: UUID;
+  revision: number;
+  furniture_type: FurnitureType;
+  item_code: "wood_screw";
   item_name: "Wood screw";
+  category: "hardware";
+  rule_name: string;
+  screws_per_connection: number;
+  connections: Array<{
+    connection_type: string;
+    connection_count: number;
+    screws_per_connection: number;
+    screw_quantity: number;
+  }>;
   total_connections: number;
   total_quantity: number;
   unit: "piece";
+}
+
+export interface BomSelection {
+  material_id: UUID;
+  hardware_material_id: UUID;
+}
+
+export interface BomMaterialCost {
+  plan_id: UUID;
+  material_id: UUID;
+  material_name: string;
+  price_per_unit: DecimalString;
+  price_unit: MaterialUnit;
+  price_effective_date: string;
+  total_volume_mm3: DecimalString;
+  total_quantity_in_price_unit: DecimalString;
+  components: Array<{
+    source_component_id: UUID;
+    component_name: string;
+    component_type: ComponentType;
+    total_volume_mm3: DecimalString;
+    quantity_in_price_unit: DecimalString;
+    cost: DecimalString;
+    sort_order: number;
+  }>;
+  total_cost: DecimalString;
+}
+
+export interface BomHardwareCost {
+  plan_id: UUID;
+  material_id: UUID;
+  material_name: string;
+  price_per_piece: DecimalString;
+  price_effective_date: string;
+  quantity: number;
+  total_cost: DecimalString;
 }
 
 export interface LaborQuantity {
