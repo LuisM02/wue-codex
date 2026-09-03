@@ -2,14 +2,25 @@
 
 import hashlib
 import json
+from collections.abc import Generator
 from io import BytesIO
 
+import pytest
 from fastapi.testclient import TestClient
 from PIL import Image, ImageDraw
 
 from wue_worker.main import app
 
 VIEWS = ("front", "back", "left", "right", "top")
+
+
+@pytest.fixture
+def client() -> Generator[TestClient, None, None]:
+    test_client = TestClient(app)
+    try:
+        yield test_client
+    finally:
+        test_client.close()
 
 
 def _chair_image(view: str, *, variant: int = 0) -> bytes:
@@ -115,8 +126,7 @@ def _files_for(factory) -> tuple[dict, list[dict[str, str]]]:
     return files, manifest
 
 
-def test_health_and_model_status_are_honest() -> None:
-    client = TestClient(app)
+def test_health_and_model_status_are_honest(client: TestClient) -> None:
     assert client.get("/health").json()["version"] == "0.1.0"
     status = client.get("/v1/model-status").json()
     assert status["ready"] is True
@@ -125,8 +135,9 @@ def test_health_and_model_status_are_honest() -> None:
     assert "silhouette" in status["pipeline"]
 
 
-def test_worker_classifies_and_reconstructs_a_photo_derived_chair() -> None:
-    client = TestClient(app)
+def test_worker_classifies_and_reconstructs_a_photo_derived_chair(
+    client: TestClient,
+) -> None:
     files, manifest = _payload()
     response = client.post(
         "/v1/classify",
@@ -158,8 +169,9 @@ def test_worker_classifies_and_reconstructs_a_photo_derived_chair() -> None:
     assert "does not yet run SAM 2" in body["warnings"][0]
 
 
-def test_visibly_different_chair_changes_the_traced_geometry() -> None:
-    client = TestClient(app)
+def test_visibly_different_chair_changes_the_traced_geometry(
+    client: TestClient,
+) -> None:
     results = []
     for variant in (0, 1):
         files, manifest = _payload(variant=variant)
@@ -181,8 +193,9 @@ def test_visibly_different_chair_changes_the_traced_geometry() -> None:
     assert first_back["profile_points"] != second_back["profile_points"]
 
 
-def test_table_and_bookshelf_use_their_observed_structural_bands() -> None:
-    client = TestClient(app)
+def test_table_and_bookshelf_use_their_observed_structural_bands(
+    client: TestClient,
+) -> None:
     cases = (
         (_table_image, "dining_table", (1800, 750, 900), "tabletop"),
         (_bookshelf_image, "bookshelf", (900, 1800, 350), "shelf_1"),
@@ -216,8 +229,7 @@ def test_table_and_bookshelf_use_their_observed_structural_bands() -> None:
         assert required_part in names
 
 
-def test_duplicate_views_and_blank_images_are_rejected() -> None:
-    client = TestClient(app)
+def test_duplicate_views_and_blank_images_are_rejected(client: TestClient) -> None:
     duplicate = _chair_image("front")
     files = {
         view: (f"{view}.png", duplicate, "image/png") for view in VIEWS
