@@ -39,6 +39,7 @@ class SegmentationProvider(Protocol):
 
     def refine_mask(
         self,
+        view_name: str,
         image: Image.Image,
         seed_mask: bytes,
         seed_bbox: tuple[int, int, int, int],
@@ -49,7 +50,7 @@ class BaselineSegmentationProvider:
     """Preserve the dependency-light foreground mask used in version 0.1."""
 
     provider_name = "wue-five-view-silhouette"
-    provider_version = "0.2.0"
+    provider_version = "0.2.1"
     classifier_name = "wue-image-structure"
     reconstruction_warning = (
         "This local pipeline traces real silhouettes but does not yet run SAM 2 "
@@ -72,11 +73,12 @@ class BaselineSegmentationProvider:
 
     def refine_mask(
         self,
+        view_name: str,
         image: Image.Image,
         seed_mask: bytes,
         seed_bbox: tuple[int, int, int, int],
     ) -> bytes:
-        del image, seed_bbox
+        del view_name, image, seed_bbox
         return seed_mask
 
 
@@ -114,7 +116,20 @@ class Sam2SegmentationProvider:
             if self._checkpoint_sha256 is not None
             else ""
         )
-        return f"0.2.0/{checkpoint_name}{digest}"
+        return f"0.2.1/{checkpoint_name}{digest}"
+
+    @staticmethod
+    def _furniture_prompt_box(
+        view_name: str, image: Image.Image
+    ) -> tuple[int, int, int, int]:
+        """Frame the centered subject without trusting a clutter-derived seed box."""
+        bottom_fraction = 0.80 if view_name == "top" else 0.98
+        return (
+            round(image.width * 0.12),
+            round(image.height * 0.06),
+            round(image.width * 0.85),
+            round(image.height * bottom_fraction),
+        )
 
     def _missing_prerequisites(self) -> list[str]:
         missing = [
@@ -157,7 +172,7 @@ class Sam2SegmentationProvider:
                 checkpoint += f" (sha256:{self._checkpoint_sha256[:16]})"
             loaded = (checkpoint,)
         limitations = [
-            "SAM 2 receives the baseline furniture bounds as a box prompt",
+            "SAM 2 expects one complete furniture item centered in each photograph",
             "Dense multi-view depth and neural part recognition are not loaded yet",
         ]
         if missing:
@@ -204,11 +219,12 @@ class Sam2SegmentationProvider:
 
     def refine_mask(
         self,
+        view_name: str,
         image: Image.Image,
         seed_mask: bytes,
         seed_bbox: tuple[int, int, int, int],
     ) -> bytes:
-        del seed_mask
+        del seed_mask, seed_bbox
         try:
             with self._lock, ExitStack() as stack:
                 predictor = self._load_predictor()
@@ -220,14 +236,13 @@ class Sam2SegmentationProvider:
                     stack.enter_context(torch.autocast("cuda", dtype=torch.bfloat16))
                 predictor.set_image(np.array(image, copy=True))
                 masks, scores, _ = predictor.predict(
-                    box=np.asarray(seed_bbox, dtype=np.float32),
+                    box=np.asarray(
+                        self._furniture_prompt_box(view_name, image),
+                        dtype=np.float32,
+                    ),
                     multimask_output=True,
                 )
                 best = int(np.argmax(scores))
-                if float(scores[best]) < 0.35:
-                    raise SegmentationUnavailable(
-                        "SAM 2 could not isolate the furniture confidently"
-                    )
                 mask = np.asarray(masks[best], dtype=np.bool_)
                 if mask.shape != (image.height, image.width):
                     raise SegmentationUnavailable(

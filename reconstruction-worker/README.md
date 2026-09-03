@@ -4,7 +4,7 @@ This process is deliberately separate from the business API. It receives exactly
 
 The default pipeline is a lightweight baseline that runs immediately on Windows without downloading a model checkpoint. It traces the actual silhouettes, checks opposite-view consistency and expected orientation, identifies structural regions, and scales them to the user's measurements. It is most reliable when one furniture item is photographed against a plain contrasting background.
 
-Version `0.2.0` also contains a lazy SAM 2.1 adapter. When deliberately configured, it uses the baseline outline only as a box prompt, replaces the foreground mask with SAM's selected mask, and records the neural provider/checkpoint provenance in the existing response contract. It never silently downloads a checkpoint and never claims dense 3D reconstruction is loaded.
+Version `0.2.1` contains a lazy SAM 2.1 adapter. When deliberately configured, it prompts SAM with the centered furniture capture area instead of trusting a clutter-sensitive color outline, replaces the foreground mask with SAM's selected mask, and records the neural provider/checkpoint provenance in the existing response contract. It never silently downloads a checkpoint and never claims dense 3D reconstruction is loaded.
 
 ## Optional SAM 2.1 provider
 

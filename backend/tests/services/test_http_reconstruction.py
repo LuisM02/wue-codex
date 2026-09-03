@@ -103,3 +103,21 @@ def test_network_failure_is_reported_as_provider_unavailable() -> None:
         match="local photo reconstruction service is unavailable",
     ):
         adapter.reconstruct(inputs(), FurnitureType.CHAIR, dimensions())
+
+
+def test_worker_failure_preserves_safe_detail() -> None:
+    adapter = HttpFurnitureReconstructor(
+        "http://127.0.0.1:8010",
+        30,
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(
+                503, json={"detail": "SAM 2 checkpoint could not load"}
+            )
+        ),
+    )
+
+    with pytest.raises(
+        ReconstructionProviderUnavailableError,
+        match="SAM 2 checkpoint could not load",
+    ):
+        adapter.reconstruct(inputs(), FurnitureType.CHAIR, dimensions())

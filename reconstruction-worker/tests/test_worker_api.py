@@ -150,7 +150,7 @@ def _files_for(factory) -> tuple[dict, list[dict[str, str]]]:
 
 
 def test_health_and_model_status_are_honest(client: TestClient) -> None:
-    assert client.get("/health").json()["version"] == "0.2.0"
+    assert client.get("/health").json()["version"] == "0.2.1"
     status = client.get("/v1/model-status").json()
     assert status["ready"] is True
     assert status["uses_gpu"] is False

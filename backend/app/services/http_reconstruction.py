@@ -27,6 +27,18 @@ class WorkerResponse(BaseModel):
     parts: list[ReconstructionPartProposal] = Field(min_length=1)
 
 
+def _worker_error_detail(response: httpx.Response) -> str:
+    try:
+        payload = response.json()
+    except ValueError:
+        return ""
+    if not isinstance(payload, dict) or not isinstance(
+        payload.get("detail"), str
+    ):
+        return ""
+    return payload["detail"].strip()[:300]
+
+
 class HttpFurnitureReconstructor:
     """Send the five source images to a separately managed AI process."""
 
@@ -84,15 +96,15 @@ class HttpFurnitureReconstructor:
             ) from exc
         if response.status_code >= 500:
             raise ReconstructionProviderUnavailableError(
-                "The local photo reconstruction service could not complete the analysis"
+                _worker_error_detail(response)
+                or (
+                    "The local photo reconstruction service could not "
+                    "complete the analysis"
+                )
             )
         if response.status_code >= 400:
-            try:
-                detail = str(response.json().get("detail", "")).strip()
-            except ValueError:
-                detail = ""
             raise InvalidReconstructionOutputError(
-                detail
+                _worker_error_detail(response)
                 or "The local photo reconstruction service rejected the image set"
             )
         try:

@@ -26,6 +26,18 @@ class WorkerClassificationResponse(BaseModel):
     confidence: float | None = Field(default=None, ge=0, le=1)
 
 
+def _worker_error_detail(response: httpx.Response) -> str:
+    try:
+        payload = response.json()
+    except ValueError:
+        return ""
+    if not isinstance(payload, dict) or not isinstance(
+        payload.get("detail"), str
+    ):
+        return ""
+    return payload["detail"].strip()[:300]
+
+
 class HttpFurnitureClassifier:
     """Send all source photographs to the separately managed vision process."""
 
@@ -77,15 +89,15 @@ class HttpFurnitureClassifier:
             ) from exc
         if response.status_code >= 500:
             raise ClassifierUnavailableError(
-                "The local furniture recognition service could not complete the analysis"
+                _worker_error_detail(response)
+                or (
+                    "The local furniture recognition service could not "
+                    "complete the analysis"
+                )
             )
         if response.status_code >= 400:
-            try:
-                detail = str(response.json().get("detail", "")).strip()
-            except ValueError:
-                detail = ""
             raise InvalidClassifierOutputError(
-                detail
+                _worker_error_detail(response)
                 or "The local furniture recognition service rejected the image set"
             )
         try:

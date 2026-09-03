@@ -76,3 +76,18 @@ def test_http_classifier_maps_transport_failure_to_unavailable() -> None:
     )
     with pytest.raises(ClassifierUnavailableError, match="unavailable"):
         classifier.classify(_images())
+
+
+def test_http_classifier_preserves_worker_failure_reason() -> None:
+    classifier = HttpFurnitureClassifier(
+        "http://worker",
+        30,
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(
+                503, json={"detail": "SAM 2 checkpoint could not load"}
+            )
+        ),
+    )
+
+    with pytest.raises(ClassifierUnavailableError, match="checkpoint could not load"):
+        classifier.classify(_images())

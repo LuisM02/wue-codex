@@ -177,7 +177,7 @@ def analyze_image(
     seed_bbox = (min(seed_xs), min(seed_ys), max(seed_xs) + 1, max(seed_ys) + 1)
     if segmentation is not None:
         seed_mask = bytes(mask)
-        refined = segmentation.refine_mask(image, seed_mask, seed_bbox)
+        refined = segmentation.refine_mask(name, image, seed_mask, seed_bbox)
         if len(refined) != width * height:
             raise ImageSetRejected(
                 f"The segmentation provider returned an invalid {name} mask"
