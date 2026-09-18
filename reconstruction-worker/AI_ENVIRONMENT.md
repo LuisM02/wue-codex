@@ -23,4 +23,4 @@ From the repository root, start the worker in PowerShell:
 
 Keep that PowerShell window open while using WUE. The worker listens on `http://127.0.0.1:8010`, matching the backend defaults.
 
-The verified integration run loaded the checkpoint on CUDA, processed five furniture views, returned six editable chair parts, and exposed the checkpoint hash through `/v1/model-status` and response provenance.
+The verified integration run loaded the checkpoint on CUDA, processed five furniture views, returned eleven editable chair parts, and exposed the checkpoint hash through `/v1/model-status` and response provenance.

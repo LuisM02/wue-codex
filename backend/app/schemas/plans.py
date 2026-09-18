@@ -152,6 +152,7 @@ class FurniturePlanRead(BaseModel):
     status: PlanStatus
     furniture_type: FurnitureType
     source_reconstruction_id: UUID | None
+    parts_reviewed_at: datetime | None
     components: list[ComponentRead]
     created_at: datetime
     updated_at: datetime

@@ -30,6 +30,8 @@ def create_plan(client: TestClient, *, finalize: bool = True) -> dict:
     draft = client.post(f"/api/v1/furniture/{furniture['id']}/plans").json()
     if not finalize:
         return draft
+    review = client.post(f"/api/v1/plans/{draft['id']}/review-parts")
+    assert review.status_code == 200
     response = client.post(f"/api/v1/plans/{draft['id']}/finalize")
     assert response.status_code == 200
     return response.json()

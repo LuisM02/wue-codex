@@ -79,6 +79,9 @@ export function PlanEditor({ furniture, plan, frontImageUrl, onPlan, onContinue 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isPhotoDerived = Boolean(plan?.source_reconstruction_id);
+  const reviewRequired = Boolean(
+    plan?.status === "draft" && isPhotoDerived && !plan.parts_reviewed_at,
+  );
 
   useEffect(() => {
     setComponents(plan?.components ?? []);
@@ -179,6 +182,21 @@ export function PlanEditor({ furniture, plan, frontImageUrl, onPlan, onContinue 
     }
   }
 
+  async function reviewParts() {
+    if (!plan || plan.status !== "draft") return;
+    setBusy("review");
+    setError(null);
+    try {
+      const reviewed = await api.plans.reviewParts(plan.id);
+      setComponents(reviewed.components);
+      onPlan(reviewed);
+    } catch (reason) {
+      setError((reason as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function revise() {
     if (!plan) return;
     setBusy("revise");
@@ -219,6 +237,13 @@ export function PlanEditor({ furniture, plan, frontImageUrl, onPlan, onContinue 
           : `WUE uses canonical X/Y/Z component geometry. Edit the reconstructed ${plan ? furnitureLabel(plan.furniture_type).toLowerCase() : "furniture"} in Front, Side, and Top views, then finish the revision to lock it for 3D and costing.`}
       </p>
       {error && <Notice tone="danger">{error}</Notice>}
+      {reviewRequired && (
+        <Notice tone="warning">
+          <strong>Review the AI-detected parts before finalizing.</strong>{" "}
+          Compare the highlighted parts with the front photograph, rename or resize incorrect parts,
+          add anything missing, and remove false detections. Confirming records your review; it does not finalize the plan.
+        </Notice>
+      )}
 
       {!plan ? (
         <div className="panel plan-empty">
@@ -236,16 +261,22 @@ export function PlanEditor({ furniture, plan, frontImageUrl, onPlan, onContinue 
             components={components}
             frontImageUrl={frontImageUrl}
             busy={busy}
+            reviewMode={reviewRequired}
             onPreview={replaceComponent}
             onPersist={persistComponent}
             onAdd={addComponent}
             onDelete={deleteComponent}
+            onReview={() => void reviewParts()}
             onFinish={() => void finalize()}
           />
           <div className="section-footer cad-section-footer">
             <div>
               <small>Revision {plan.revision}</small>
-              <strong>{plan.status === "draft" ? "Editable 2D source of truth" : "Locked for deterministic 3D and estimates"}</strong>
+              <strong>{plan.status === "draft"
+                ? reviewRequired
+                  ? "AI proposal · user review required"
+                  : "Editable 2D source of truth"
+                : "Locked for deterministic 3D and estimates"}</strong>
             </div>
             {plan.status === "finalized" && (
               <div className="button-row">

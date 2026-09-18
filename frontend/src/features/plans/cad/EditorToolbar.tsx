@@ -7,6 +7,7 @@ interface Props {
   photoVisible: boolean;
   hasPhoto: boolean;
   locked: boolean;
+  reviewMode: boolean;
   busy: boolean;
   canUndo: boolean;
   canRedo: boolean;
@@ -96,9 +97,19 @@ export function EditorToolbar(props: Props) {
         className="cad-finish"
         disabled={props.locked || props.busy}
         onClick={props.onFinish}
-        title={props.locked ? "This revision is finalized and locked" : "Validate and finalize this 2D revision"}
+        title={props.locked
+          ? "This revision is finalized and locked"
+          : props.reviewMode
+            ? "Confirm that the detected parts have been reviewed"
+            : "Validate and finalize this 2D revision"}
       >
-        {props.locked ? "Finalized / locked" : props.busy ? "Saving…" : "Finish 2D"}
+        {props.locked
+          ? "Finalized / locked"
+          : props.busy
+            ? "Saving…"
+            : props.reviewMode
+              ? "Confirm parts"
+              : "Finish 2D"}
       </button>
     </header>
   );

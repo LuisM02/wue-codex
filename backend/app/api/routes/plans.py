@@ -150,6 +150,18 @@ def get_labor_quantity(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
+@plans_router.post("/{plan_id}/review-parts", response_model=FurniturePlanRead)
+def review_plan_parts(
+    plan_id: UUID,
+    session: SessionDependency,
+) -> FurniturePlanRead:
+    plan = require_plan(session, plan_id)
+    try:
+        return plan_service.review_plan_parts(session, plan)
+    except plan_service.PlanNotDraftError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
 @plans_router.post("/{plan_id}/finalize", response_model=FurniturePlanRead)
 def finalize_plan(
     plan_id: UUID,
@@ -158,7 +170,10 @@ def finalize_plan(
     plan = require_plan(session, plan_id)
     try:
         return plan_service.finalize_plan(session, plan)
-    except plan_service.PlanNotDraftError as exc:
+    except (
+        plan_service.PlanNotDraftError,
+        plan_service.PlanPartsReviewRequiredError,
+    ) as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except PlanSemanticValidationError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc

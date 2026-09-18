@@ -45,6 +45,10 @@ class PhotoReconstructionRequiredError(RuntimeError):
     """Raised instead of silently substituting generic furniture geometry."""
 
 
+class PlanPartsReviewRequiredError(RuntimeError):
+    """Raised when photo-derived parts have not been accepted by the user."""
+
+
 COMPONENT_COPY_FIELDS = (
     "component_name",
     "component_type",
@@ -219,6 +223,10 @@ def create_initial_plan(session: Session, furniture: Furniture) -> FurniturePlan
 def finalize_plan(session: Session, plan: FurniturePlan) -> FurniturePlan:
     """Validate and permanently transition a draft to finalized."""
     require_draft(plan)
+    if plan.source_reconstruction_id is not None and plan.parts_reviewed_at is None:
+        raise PlanPartsReviewRequiredError(
+            "Review and confirm the AI-detected parts before finalizing the 2D plan"
+        )
     validate_plan_components(plan.furniture_type, plan.components)
     plan.status = PlanStatus.FINALIZED
     _touch(plan)
@@ -227,6 +235,18 @@ def finalize_plan(session: Session, plan: FurniturePlan) -> FurniturePlan:
     if finalized is None:  # pragma: no cover - database invariant defense
         raise RuntimeError("Finalized plan could not be reloaded")
     return finalized
+
+
+def review_plan_parts(session: Session, plan: FurniturePlan) -> FurniturePlan:
+    """Record the user's approval of the editable AI part proposal."""
+    require_draft(plan)
+    plan.parts_reviewed_at = datetime.now(timezone.utc)
+    _touch(plan)
+    commit(session)
+    reviewed = get_plan(session, plan.id)
+    if reviewed is None:  # pragma: no cover - database invariant defense
+        raise RuntimeError("Reviewed plan could not be reloaded")
+    return reviewed
 
 
 def create_revision(session: Session, source: FurniturePlan) -> FurniturePlan:
@@ -251,6 +271,7 @@ def create_revision(session: Session, source: FurniturePlan) -> FurniturePlan:
             status=PlanStatus.DRAFT,
             furniture_type=source.furniture_type,
             source_reconstruction_id=source.source_reconstruction_id,
+            parts_reviewed_at=datetime.now(timezone.utc),
         )
         session.add(plan)
         session.flush()

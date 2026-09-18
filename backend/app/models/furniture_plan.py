@@ -1,10 +1,12 @@
 """Versioned parametric 2D furniture plan."""
 
+from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
     CheckConstraint,
+    DateTime,
     Enum as SAEnum,
     ForeignKey,
     Index,
@@ -91,6 +93,10 @@ class FurniturePlan(TimestampMixin, Base):
         ForeignKey("furniture_reconstructions.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
+    )
+    parts_reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )
 
     furniture: Mapped["Furniture"] = relationship(back_populates="plans")

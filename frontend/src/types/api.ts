@@ -122,6 +122,7 @@ export interface FurniturePlan {
   status: PlanStatus;
   furniture_type: FurnitureType;
   source_reconstruction_id: UUID | null;
+  parts_reviewed_at: string | null;
   components: PlanComponent[];
   created_at: string;
   updated_at: string;

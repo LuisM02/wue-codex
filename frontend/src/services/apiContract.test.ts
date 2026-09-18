@@ -76,6 +76,7 @@ describe("frontend/backend API route contract", () => {
       api.plans.addComponent("plan-id", component),
       api.plans.updateComponent("plan-id", "component-id", component),
       api.plans.deleteComponent("plan-id", "component-id"),
+      api.plans.reviewParts("plan-id"),
       api.plans.finalize("plan-id"),
       api.plans.revise("plan-id"),
       api.plans.rebuildFromPhotos("plan-id"),

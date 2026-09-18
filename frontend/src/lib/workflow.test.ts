@@ -42,6 +42,7 @@ describe("workflow access", () => {
   it("opens preview and BOM for a finalized plan, then costing after BOM selection", () => {
     const draft = context({ project, furniture, plan: {
       id: "plan", furniture_id: "f", revision: 1, status: "draft", furniture_type: "chair", source_reconstruction_id: null,
+      parts_reviewed_at: null,
       components: [], created_at: "", updated_at: "",
     } });
     expect(canOpenStep("model", draft)).toBe(false);

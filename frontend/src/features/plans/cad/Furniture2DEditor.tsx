@@ -13,10 +13,12 @@ interface Props {
   components: PlanComponent[];
   frontImageUrl?: string;
   busy: string | null;
+  reviewMode: boolean;
   onPreview: (component: PlanComponent) => void;
   onPersist: (before: PlanComponent, after: PlanComponent) => Promise<PlanComponent | null>;
   onAdd: () => Promise<PlanComponent | null>;
   onDelete: (component: PlanComponent) => Promise<boolean>;
+  onReview: () => void;
   onFinish: () => void;
 }
 
@@ -28,17 +30,19 @@ export function Furniture2DEditor({
   components,
   frontImageUrl,
   busy,
+  reviewMode,
   onPreview,
   onPersist,
   onAdd,
   onDelete,
+  onReview,
   onFinish,
 }: Props) {
   const [view, setView] = useState<OrthographicView>("front");
   const [selectedId, setSelectedId] = useState<string | null>(components[0]?.id ?? null);
   const [gridVisible, setGridVisible] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
-  const [photoVisible, setPhotoVisible] = useState(false);
+  const [photoVisible, setPhotoVisible] = useState(reviewMode && Boolean(frontImageUrl));
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [, setHistoryVersion] = useState(0);
@@ -161,6 +165,7 @@ export function Furniture2DEditor({
         photoVisible={photoVisible}
         hasPhoto={Boolean(frontImageUrl)}
         locked={locked}
+        reviewMode={reviewMode}
         busy={Boolean(busy)}
         canUndo={history.current.canUndo}
         canRedo={history.current.canRedo}
@@ -174,7 +179,7 @@ export function Furniture2DEditor({
         onZoomIn={() => setZoom((value) => Math.min(MAX_ZOOM, value * 1.2))}
         onZoomOut={() => setZoom((value) => Math.max(MIN_ZOOM, value / 1.2))}
         onFit={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
-        onFinish={onFinish}
+        onFinish={reviewMode ? onReview : onFinish}
       />
       <div className="cad-editor-grid">
         <ComponentPanel

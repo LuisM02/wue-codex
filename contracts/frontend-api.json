@@ -23,6 +23,7 @@
     { "method": "POST", "path": "/api/v1/plans/{plan_id}/components" },
     { "method": "PATCH", "path": "/api/v1/plans/{plan_id}/components/{component_id}" },
     { "method": "DELETE", "path": "/api/v1/plans/{plan_id}/components/{component_id}" },
+    { "method": "POST", "path": "/api/v1/plans/{plan_id}/review-parts" },
     { "method": "POST", "path": "/api/v1/plans/{plan_id}/finalize" },
     { "method": "POST", "path": "/api/v1/plans/{plan_id}/revisions" },
     { "method": "POST", "path": "/api/v1/plans/{plan_id}/revisions/from-reconstruction" },

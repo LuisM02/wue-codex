@@ -96,6 +96,7 @@ export const api = {
       request<PlanComponent>(`/plans/${planId}/components/${componentId}`, { method: "PATCH", body: JSON.stringify(payload) }),
     deleteComponent: (planId: UUID, componentId: UUID) =>
       request<void>(`/plans/${planId}/components/${componentId}`, { method: "DELETE" }),
+    reviewParts: (planId: UUID) => request<FurniturePlan>(`/plans/${planId}/review-parts`, { method: "POST" }),
     finalize: (planId: UUID) => request<FurniturePlan>(`/plans/${planId}/finalize`, { method: "POST" }),
     revise: (planId: UUID) => request<FurniturePlan>(`/plans/${planId}/revisions`, { method: "POST" }),
     rebuildFromPhotos: (planId: UUID) => request<FurniturePlan>(`/plans/${planId}/revisions/from-reconstruction`, { method: "POST" }),

@@ -31,6 +31,8 @@ def create_draft(client: TestClient, furniture_type: str) -> dict:
 
 
 def finalize(client: TestClient, draft: dict) -> dict:
+    review = client.post(f"/api/v1/plans/{draft['id']}/review-parts")
+    assert review.status_code == 200
     response = client.post(f"/api/v1/plans/{draft['id']}/finalize")
     assert response.status_code == 200
     return response.json()

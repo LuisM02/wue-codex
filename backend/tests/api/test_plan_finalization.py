@@ -24,7 +24,12 @@ GEOMETRY_FIELDS = (
 )
 
 
-def create_draft(client: TestClient, furniture_type: str = "chair") -> dict:
+def create_draft(
+    client: TestClient,
+    furniture_type: str = "chair",
+    *,
+    review: bool = True,
+) -> dict:
     project = client.post("/api/v1/projects", json={"name": "Finalization"})
     furniture = client.post(
         f"/api/v1/projects/{project.json()['id']}/furniture",
@@ -39,11 +44,39 @@ def create_draft(client: TestClient, furniture_type: str = "chair") -> dict:
     prepare_test_reconstruction(client, furniture_id)
     response = client.post(f"/api/v1/furniture/{furniture_id}/plans")
     assert response.status_code == 201
+    if review:
+        response = client.post(
+            f"/api/v1/plans/{response.json()['id']}/review-parts"
+        )
+        assert response.status_code == 200
     return response.json()
 
 
 def geometry(component: dict) -> dict:
     return {field: component[field] for field in GEOMETRY_FIELDS}
+
+
+def test_photo_parts_must_be_reviewed_before_finalization(
+    db_client: TestClient,
+) -> None:
+    draft = create_draft(db_client, review=False)
+    plan_url = f"/api/v1/plans/{draft['id']}"
+    assert draft["parts_reviewed_at"] is None
+
+    blocked = db_client.post(f"{plan_url}/finalize")
+    assert blocked.status_code == 409
+    assert blocked.json() == {
+        "detail": "Review and confirm the AI-detected parts before finalizing the 2D plan"
+    }
+
+    reviewed = db_client.post(f"{plan_url}/review-parts")
+    assert reviewed.status_code == 200
+    assert reviewed.json()["parts_reviewed_at"] is not None
+
+    finalized = db_client.post(f"{plan_url}/finalize")
+    assert finalized.status_code == 200
+    assert finalized.json()["status"] == "finalized"
+    assert db_client.post(f"{plan_url}/review-parts").status_code == 409
 
 
 @pytest.mark.parametrize("furniture_type", ["chair", "dining_table", "bookshelf"])
