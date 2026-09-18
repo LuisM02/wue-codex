@@ -425,6 +425,8 @@ h1, h2, h3, strong, .button { font-family: "Manrope", "DM Sans", sans-serif; }
 .cad-selection-box { fill: none; stroke: #f2c778; stroke-width: 1; stroke-dasharray: 5 3; vector-effect: non-scaling-stroke; pointer-events: none; }
 .cad-resize-handle { fill: #fff1c9; stroke: #9b633b; stroke-width: 1.2; cursor: nwse-resize; vector-effect: non-scaling-stroke; }
 .cad-resize-handle:nth-of-type(3), .cad-resize-handle:nth-of-type(4) { cursor: nesw-resize; }
+.cad-profile-handle { fill: #fff7d8; stroke: #2f6d4d; stroke-width: 2; cursor: crosshair; vector-effect: non-scaling-stroke; }
+.cad-profile-handle:hover { fill: #f5c77d; stroke: #173f2d; }
 .cad-dimension line { stroke: #f0d69e; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .cad-dimension text { fill: #fff0ca; font: 700 9px "DM Sans", sans-serif; paint-order: stroke; stroke: #25302b; stroke-width: 3px; }
 .cad-dimension-arrow { fill: #f0d69e; }

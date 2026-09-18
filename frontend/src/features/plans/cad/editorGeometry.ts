@@ -254,6 +254,40 @@ export function resizeComponent(
   return next;
 }
 
+export function moveProfilePoint(
+  component: PlanComponent,
+  pointIndex: number,
+  deltaX: number,
+  deltaY: number,
+  scale: number,
+  gridSpacing: number | null,
+): PlanComponent {
+  if (component.geometry_kind !== "extruded_profile" || !component.profile_points?.[pointIndex]) {
+    return component;
+  }
+  const delta = screenDeltaToWorld(deltaX, deltaY, scale);
+  const original = component.profile_points[pointIndex];
+  const width = numeric(component.width);
+  const height = numeric(component.height);
+  let u = numeric(original.u) + delta.horizontal;
+  let v = numeric(original.v) + delta.vertical;
+  if (gridSpacing) {
+    u = snapToGrid(u, gridSpacing);
+    v = snapToGrid(v, gridSpacing);
+  }
+  u = Math.min(width, Math.max(0, u));
+  v = Math.min(height, Math.max(0, v));
+  const points = component.profile_points.map((point, index) => index === pointIndex
+    ? { u: decimal(u), v: decimal(v) }
+    : point);
+  const doubledArea = Math.abs(points.reduce((sum, point, index) => {
+    const next = points[(index + 1) % points.length];
+    return sum + numeric(point.u) * numeric(next.v) - numeric(next.u) * numeric(point.v);
+  }, 0));
+  if (doubledArea < 0.0002) return component;
+  return { ...component, profile_points: points };
+}
+
 export function nextShelfName(components: PlanComponent[]): string {
   const used = new Set(
     components

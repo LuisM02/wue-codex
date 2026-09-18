@@ -6,6 +6,7 @@ import {
   canMutatePlan,
   edgeSnap,
   moveComponent,
+  moveProfilePoint,
   nextShelfName,
   projectComponent,
   resizeComponent,
@@ -86,6 +87,37 @@ describe("orthographic CAD geometry", () => {
     const resized = resizeComponent(component, "side", "north-east", 40, -20, 2, null);
     expect(Number(resized.depth)).toBe(440);
     expect(Number(resized.height)).toBe(50);
+  });
+
+  it("moves one traced outline point in front-view coordinates", () => {
+    const profile = {
+      ...component,
+      geometry_kind: "extruded_profile" as const,
+      profile_points: [
+        { u: "0", v: "0" },
+        { u: "450", v: "0" },
+        { u: "450", v: "40" },
+        { u: "0", v: "40" },
+      ],
+    };
+    const moved = moveProfilePoint(profile, 2, -20, 10, 2, null);
+    expect(moved.profile_points?.[2]).toEqual({ u: "440", v: "35" });
+    expect(moved.profile_points?.[1]).toEqual({ u: "450", v: "0" });
+  });
+
+  it("clamps and snaps traced points inside their component bounds", () => {
+    const profile = {
+      ...component,
+      geometry_kind: "extruded_profile" as const,
+      profile_points: [
+        { u: "0", v: "0" },
+        { u: "450", v: "0" },
+        { u: "450", v: "40" },
+        { u: "0", v: "40" },
+      ],
+    };
+    const moved = moveProfilePoint(profile, 2, 80, 22, 1, 25);
+    expect(moved.profile_points?.[2]).toEqual({ u: "450", v: "25" });
   });
 
   it("chooses the next missing valid shelf number", () => {

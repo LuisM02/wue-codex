@@ -2,7 +2,7 @@
 
 Work proceeds in small, tested modules. Each module receives focused service tests, API tests where relevant, a full regression run, and a clean commit before the next module begins.
 
-Current status: Modules 1 through 17, the parametric CAD editor, Module 18A, Module 18B1, Modules 19A through 19C, Modules 20 and 21 complete. Version 0.21.0 is the verified human-review baseline.
+Current status: Modules 1 through 17, the parametric CAD editor, Module 18A, Module 18B1, Modules 19A through 19C, and Modules 20 through 22 complete. Version 0.22.0 is the verified outline-editing baseline.
 
 1. **Backend foundation (complete)** — FastAPI application factory, environment settings, PostgreSQL/SQLAlchemy session architecture, health endpoints, pytest setup, and project documentation.
 2. **Projects and furniture (complete)** — UUID-backed project and furniture models plus CRUD APIs constrained to chair, dining table, and bookshelf.
@@ -30,6 +30,7 @@ Current status: Modules 1 through 17, the parametric CAD editor, Module 18A, Mod
 19. **End-to-end hardening**
     - **19A — isolated real PostgreSQL verification (complete):** each integration session creates, migrates, tests, and removes a uniquely named disposable database, so retained rows in a shared test database cannot contaminate results. The complete 337-test backend suite passes on PostgreSQL 18.
     - **19B — contract and accessibility hardening (complete):** a shared manifest is exercised by every frontend API method and checked against FastAPI OpenAPI; expected optional 404s remain quiet while genuine partial-load failures identify the affected resource. CAD toolbar/toggle/status semantics and keyboard-only selection were verified in the live app.
-    - **19C — release regression (complete):** version 0.21.0 passes all 337 backend tests on PostgreSQL 18, all 12 reconstruction-worker tests, all 25 frontend tests, the optimized production build, and a live browser workflow/accessibility check with no console errors.
+    - **19C — release regression (complete):** version 0.22.0 passes all 337 backend tests on PostgreSQL 18, all 12 reconstruction-worker tests, all 27 frontend tests, and the optimized production build. Its focused live CAD check rendered 56 outline controls across the saved chair's 11 traced parts with no browser console errors or warnings.
 20. **BOM-first costing workflow (complete)** — a dedicated post-3D bill of materials separates engineering quantities from the commercial quote, shows material and hardware summaries plus a per-part audit, carries selected purchasing stock into quotation costing, and provides first-run local wood, screw, and labor price setup without inventing market prices.
 21. **Human part-review gate (complete)** — every newly reconstructed draft opens with its front photograph and editable AI parts, records an explicit user confirmation, blocks finalization until that review exists, preserves approved copied revisions, and resets review when a revision is rebuilt from new photo analysis.
+22. **Traced-outline control points (complete)** — selected photo-derived polygons expose draggable Front-view vertices over the reference image, preserve point order and valid area, clamp edits to the component bounds, support optional 5 mm snapping, participate in Undo/Redo, and persist through the existing component API so the same edited outline drives 3D extrusion and material volume.

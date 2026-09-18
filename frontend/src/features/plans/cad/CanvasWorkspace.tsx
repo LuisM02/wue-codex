@@ -7,6 +7,7 @@ import {
   applyProjectedPosition,
   edgeSnap,
   moveComponent,
+  moveProfilePoint,
   projectComponent,
   projectionBounds,
   resizeComponent,
@@ -20,6 +21,7 @@ const CANVAS_HEIGHT = 620;
 const MARGIN_X = 88;
 const MARGIN_Y = 64;
 const GRID_SPACING_MM = 25;
+const OUTLINE_SNAP_MM = 5;
 
 interface Props {
   components: PlanComponent[];
@@ -42,6 +44,7 @@ interface Props {
 type Interaction =
   | { type: "move"; pointerId: number; start: { x: number; y: number }; before: PlanComponent }
   | { type: "resize"; pointerId: number; start: { x: number; y: number }; before: PlanComponent; handle: ResizeHandle }
+  | { type: "profile-point"; pointerId: number; start: { x: number; y: number }; before: PlanComponent; pointIndex: number }
   | { type: "pan"; pointerId: number; start: { x: number; y: number }; before: { x: number; y: number } };
 
 function clientPoint(event: ReactPointerEvent<SVGElement>): { x: number; y: number } {
@@ -111,6 +114,19 @@ export function CanvasWorkspace({
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
+  function beginProfilePoint(event: ReactPointerEvent<SVGCircleElement>, component: PlanComponent, pointIndex: number) {
+    event.stopPropagation();
+    if (locked || event.button !== 0) return;
+    interaction.current = {
+      type: "profile-point",
+      pointerId: event.pointerId,
+      start: clientPoint(event),
+      before: component,
+      pointIndex,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
   function beginCanvas(event: ReactPointerEvent<SVGRectElement>) {
     if (event.button === 1 || event.altKey) {
       event.preventDefault();
@@ -141,6 +157,19 @@ export function CanvasWorkspace({
           deltaY,
           scale,
           snapEnabled ? GRID_SPACING_MM : null,
+        ),
+      );
+      return;
+    }
+    if (active.type === "profile-point") {
+      onPreview(
+        moveProfilePoint(
+          active.before,
+          active.pointIndex,
+          deltaX,
+          deltaY,
+          scale,
+          snapEnabled ? OUTLINE_SNAP_MM : null,
         ),
       );
       return;
@@ -274,6 +303,18 @@ export function CanvasWorkspace({
                     onPointerDown={(event) => beginResize(event, selected, handle)}
                   />
                 ))}
+                {!locked && view === "front" && selected.profile_points?.map((point, pointIndex) => (
+                  <circle
+                    key={`profile-point-${pointIndex}`}
+                    cx={toScreenHorizontal(selectedProjection.horizontal + Number(point.u))}
+                    cy={toScreenVertical(selectedProjection.vertical + Number(point.v))}
+                    r="6"
+                    className="cad-profile-handle"
+                    pointerEvents="all"
+                    aria-label={`Move outline point ${pointIndex + 1}`}
+                    onPointerDown={(event) => beginProfilePoint(event, selected, pointIndex)}
+                  />
+                ))}
                 <g className="cad-dimension" pointerEvents="none">
                   <line x1={left} x2={right} y1={bottom + 28} y2={bottom + 28} markerStart="url(#cad-dimension-arrow)" markerEnd="url(#cad-dimension-arrow)" />
                   <text x={(left + right) / 2} y={bottom + 22} textAnchor="middle">{selectedProjection.width.toFixed(1)} mm</text>
@@ -293,9 +334,17 @@ export function CanvasWorkspace({
         </svg>
       </div>
       <footer className="cad-statusbar">
-        <span>{locked ? "Read-only inspection" : "Drag parts · drag corner handles to resize · Alt-drag or middle-drag to pan"}</span>
+        <span>{locked
+          ? "Read-only inspection"
+          : view === "front" && selected?.profile_points
+            ? "Drag round points to reshape the traced outline · square handles resize the whole part"
+            : "Drag parts · drag corner handles to resize · Alt-drag or middle-drag to pan"}</span>
         <span>{definition.horizontalLabel} horizontal · {definition.verticalLabel} vertical</span>
-        <span>Grid {visibleGridSpacing} mm · {snapEnabled ? `Snap ${GRID_SPACING_MM} mm` : "Snap off"}</span>
+        <span>Grid {visibleGridSpacing} mm · {snapEnabled
+          ? view === "front" && selected?.profile_points
+            ? `Outline snap ${OUTLINE_SNAP_MM} mm`
+            : `Snap ${GRID_SPACING_MM} mm`
+          : "Snap off"}</span>
       </footer>
     </main>
   );
