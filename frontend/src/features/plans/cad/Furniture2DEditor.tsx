@@ -1,17 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { FurniturePlan, PlanComponent } from "../../../types/api";
+import type { FurniturePlan, ImageView, PlanComponent } from "../../../types/api";
 import { CanvasWorkspace } from "./CanvasWorkspace";
 import { ComponentPanel } from "./ComponentPanel";
 import { EditorToolbar } from "./EditorToolbar";
 import { EditorHistory } from "./editorHistory";
 import { canMutatePlan, semanticWarnings, type OrthographicView } from "./editorGeometry";
 import { PropertiesPanel } from "./PropertiesPanel";
+import {
+  initialReferenceByView,
+  referenceOptionsForView,
+  type ReferenceImageUrls,
+} from "./referencePhotos";
 
 interface Props {
   plan: FurniturePlan;
   components: PlanComponent[];
-  frontImageUrl?: string;
+  referenceImageUrls: ReferenceImageUrls;
   busy: string | null;
   reviewMode: boolean;
   onPreview: (component: PlanComponent) => void;
@@ -28,7 +33,7 @@ const MAX_ZOOM = 4;
 export function Furniture2DEditor({
   plan,
   components,
-  frontImageUrl,
+  referenceImageUrls,
   busy,
   reviewMode,
   onPreview,
@@ -42,7 +47,9 @@ export function Furniture2DEditor({
   const [selectedId, setSelectedId] = useState<string | null>(components[0]?.id ?? null);
   const [gridVisible, setGridVisible] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
-  const [photoVisible, setPhotoVisible] = useState(reviewMode && Boolean(frontImageUrl));
+  const [photoVisible, setPhotoVisible] = useState(reviewMode);
+  const [referenceByView, setReferenceByView] = useState(() => initialReferenceByView(referenceImageUrls));
+  const [mirroredReferences, setMirroredReferences] = useState<Partial<Record<ImageView, boolean>>>({});
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [, setHistoryVersion] = useState(0);
@@ -50,6 +57,10 @@ export function Furniture2DEditor({
   const locked = !canMutatePlan(plan.status);
   const warnings = semanticWarnings(plan.furniture_type, components);
   const selected = components.find((component) => component.id === selectedId) ?? null;
+  const referenceOptions = referenceOptionsForView(view, referenceImageUrls);
+  const referenceView = referenceByView[view];
+  const referenceImageUrl = referenceView ? referenceImageUrls[referenceView] : undefined;
+  const referenceMirrored = referenceView ? Boolean(mirroredReferences[referenceView]) : false;
 
   function refreshHistoryState() {
     setHistoryVersion((version) => version + 1);
@@ -71,6 +82,19 @@ export function Furniture2DEditor({
     setView(next);
     setZoom(1);
     setPan({ x: 0, y: 0 });
+  }
+
+  function setReferenceView(next: ImageView) {
+    setReferenceByView((current) => ({ ...current, [view]: next }));
+    setPhotoVisible(true);
+  }
+
+  function toggleReferenceMirror() {
+    if (!referenceView) return;
+    setMirroredReferences((current) => ({
+      ...current,
+      [referenceView]: !current[referenceView],
+    }));
   }
 
   async function commit(before: PlanComponent, after: PlanComponent) {
@@ -163,7 +187,7 @@ export function Furniture2DEditor({
         gridVisible={gridVisible}
         snapEnabled={snapEnabled}
         photoVisible={photoVisible}
-        hasPhoto={Boolean(frontImageUrl)}
+        hasPhoto={Boolean(referenceImageUrl)}
         locked={locked}
         reviewMode={reviewMode}
         busy={Boolean(busy)}
@@ -200,12 +224,17 @@ export function Furniture2DEditor({
           locked={locked}
           gridVisible={gridVisible}
           snapEnabled={snapEnabled}
-          frontImageUrl={frontImageUrl}
+          referenceImageUrl={referenceImageUrl}
+          referenceView={referenceView}
+          referenceMirrored={referenceMirrored}
+          referenceOptions={referenceOptions}
           photoVisible={photoVisible}
           zoom={zoom}
           pan={pan}
           onPan={setPan}
           onZoom={(direction) => setZoom((value) => direction > 0 ? Math.min(MAX_ZOOM, value * 1.12) : Math.max(MIN_ZOOM, value / 1.12))}
+          onReference={setReferenceView}
+          onMirror={toggleReferenceMirror}
           onSelect={setSelectedId}
           onPreview={onPreview}
           onCommit={(before, after) => void commit(before, after)}

@@ -6,11 +6,12 @@ import { api } from "../../services/apiClient";
 import type { Furniture, FurniturePlan, PlanComponent, PlanComponentPayload } from "../../types/api";
 import { Furniture2DEditor } from "./cad/Furniture2DEditor";
 import { nextShelfName } from "./cad/editorGeometry";
+import type { ReferenceImageUrls } from "./cad/referencePhotos";
 
 interface Props {
   furniture: Furniture;
   plan: FurniturePlan | null;
-  frontImageUrl?: string;
+  referenceImageUrls: ReferenceImageUrls;
   onPlan: (plan: FurniturePlan) => void;
   onContinue: () => void;
 }
@@ -74,7 +75,7 @@ function addedPartPayload(plan: FurniturePlan, components: PlanComponent[]): Pla
   };
 }
 
-export function PlanEditor({ furniture, plan, frontImageUrl, onPlan, onContinue }: Props) {
+export function PlanEditor({ furniture, plan, referenceImageUrls, onPlan, onContinue }: Props) {
   const [components, setComponents] = useState<PlanComponent[]>(plan?.components ?? []);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -240,7 +241,7 @@ export function PlanEditor({ furniture, plan, frontImageUrl, onPlan, onContinue 
       {reviewRequired && (
         <Notice tone="warning">
           <strong>Review the AI-detected parts before finalizing.</strong>{" "}
-          Compare the highlighted parts with the front photograph, rename or resize incorrect parts,
+          Compare the highlighted parts with the matching Front/Back, Left/Right, and Top photographs, rename or resize incorrect parts,
           add anything missing, and remove false detections. Confirming records your review; it does not finalize the plan.
         </Notice>
       )}
@@ -259,7 +260,7 @@ export function PlanEditor({ furniture, plan, frontImageUrl, onPlan, onContinue 
           <Furniture2DEditor
             plan={plan}
             components={components}
-            frontImageUrl={frontImageUrl}
+            referenceImageUrls={referenceImageUrls}
             busy={busy}
             reviewMode={reviewRequired}
             onPreview={replaceComponent}

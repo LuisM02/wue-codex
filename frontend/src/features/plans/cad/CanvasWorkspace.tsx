@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
 
-import type { PlanComponent } from "../../../types/api";
+import type { ImageView, PlanComponent } from "../../../types/api";
 import {
   VIEW_DEFINITIONS,
   applyProjectedPosition,
@@ -18,6 +18,7 @@ import {
   type OrthographicView,
   type ResizeHandle,
 } from "./editorGeometry";
+import type { ReferenceOption } from "./referencePhotos";
 
 const CANVAS_WIDTH = 1000;
 const CANVAS_HEIGHT = 620;
@@ -33,12 +34,17 @@ interface Props {
   locked: boolean;
   gridVisible: boolean;
   snapEnabled: boolean;
-  frontImageUrl?: string;
+  referenceImageUrl?: string;
+  referenceView: ImageView | null;
+  referenceMirrored: boolean;
+  referenceOptions: ReferenceOption[];
   photoVisible: boolean;
   zoom: number;
   pan: { x: number; y: number };
   onPan: (pan: { x: number; y: number }) => void;
   onZoom: (direction: 1 | -1) => void;
+  onReference: (view: ImageView) => void;
+  onMirror: () => void;
   onSelect: (id: string | null) => void;
   onPreview: (component: PlanComponent) => void;
   onCommit: (before: PlanComponent, after: PlanComponent) => void;
@@ -70,12 +76,17 @@ export function CanvasWorkspace({
   locked,
   gridVisible,
   snapEnabled,
-  frontImageUrl,
+  referenceImageUrl,
+  referenceView,
+  referenceMirrored,
+  referenceOptions,
   photoVisible,
   zoom,
   pan,
   onPan,
   onZoom,
+  onReference,
+  onMirror,
   onSelect,
   onPreview,
   onCommit,
@@ -248,6 +259,21 @@ export function CanvasWorkspace({
   return (
     <main className="cad-workspace">
       <div className="cad-canvas-frame">
+        {referenceOptions.length > 0 && (
+          <div className="cad-reference-controls" role="group" aria-label="Reference photograph controls">
+            <label>
+              <span>Reference</span>
+              <select
+                aria-label="Reference photograph"
+                value={referenceView ?? ""}
+                onChange={(event) => onReference(event.target.value as ImageView)}
+              >
+                {referenceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+            <button type="button" aria-pressed={referenceMirrored} onClick={onMirror} title="Mirror the reference photograph horizontally">↔ Mirror</button>
+          </div>
+        )}
         <svg
           viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`}
           role="img"
@@ -267,8 +293,18 @@ export function CanvasWorkspace({
           </defs>
           <rect className="cad-canvas-background" width={CANVAS_WIDTH} height={CANVAS_HEIGHT} onPointerDown={beginCanvas} />
           {gridVisible && <rect className="cad-grid" width={CANVAS_WIDTH} height={CANVAS_HEIGHT} fill="url(#cad-minor-grid)" pointerEvents="none" />}
-          {view === "front" && frontImageUrl && photoVisible && (
-            <image href={frontImageUrl} x="0" y="0" width={CANVAS_WIDTH} height={CANVAS_HEIGHT} preserveAspectRatio="xMidYMid meet" className="cad-reference-photo" pointerEvents="none" />
+          {referenceImageUrl && photoVisible && (
+            <image
+              href={referenceImageUrl}
+              x="0"
+              y="0"
+              width={CANVAS_WIDTH}
+              height={CANVAS_HEIGHT}
+              preserveAspectRatio="xMidYMid meet"
+              className="cad-reference-photo"
+              pointerEvents="none"
+              transform={referenceMirrored ? `translate(${CANVAS_WIDTH} 0) scale(-1 1)` : undefined}
+            />
           )}
           {view !== "top" && (
             <line className="cad-ground-line" x1="24" x2={CANVAS_WIDTH - 24} y1={toScreenVertical(0)} y2={toScreenVertical(0)} />

@@ -19,6 +19,7 @@ import type {
   FurnitureDimensions,
   FurnitureImage,
   FurniturePlan,
+  ImageView,
   Project,
 } from "./types/api";
 
@@ -97,6 +98,12 @@ export default function App() {
     plan,
     bomSelection,
   }), [project, furniture, images, dimensions, plan, bomSelection]);
+  const referenceImageUrls = useMemo<Partial<Record<ImageView, string>>>(() => {
+    if (!furniture) return {};
+    return Object.fromEntries(
+      images.map((image) => [image.view, api.images.contentUrl(furniture.id, image.view)]),
+    );
+  }, [furniture, images]);
 
   function changeProject(value: Project | null) {
     setError(null);
@@ -197,7 +204,7 @@ export default function App() {
           <PlanEditor
             furniture={furniture}
             plan={plan}
-            frontImageUrl={images.some((image) => image.view === "front") ? api.images.contentUrl(furniture.id, "front") : undefined}
+            referenceImageUrls={referenceImageUrls}
             onPlan={setPlan}
             onContinue={() => visit("model")}
           />

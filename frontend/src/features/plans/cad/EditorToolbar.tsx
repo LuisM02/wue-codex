@@ -79,7 +79,7 @@ export function EditorToolbar(props: Props) {
         <ToolButton label="Grid" icon="#" title="Toggle drawing grid" active={props.gridVisible} toggle onClick={props.onGrid} />
         <ToolButton label="Snap" icon="⊹" title="Snap movement and resizing to the grid and nearby edges" active={props.snapEnabled} toggle onClick={props.onSnap} />
         {props.hasPhoto && (
-          <ToolButton label="Photo" icon="◩" title="Toggle the front reference photograph" active={props.photoVisible} toggle disabled={props.view !== "front"} onClick={props.onPhoto} />
+          <ToolButton label="Photo" icon="◩" title="Toggle the current reference photograph" active={props.photoVisible} toggle onClick={props.onPhoto} />
         )}
       </div>
       <div className="cad-toolbar__group">
