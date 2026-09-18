@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
+from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -47,6 +48,10 @@ class PhotoReconstructionRequiredError(RuntimeError):
 
 class PlanPartsReviewRequiredError(RuntimeError):
     """Raised when photo-derived parts have not been accepted by the user."""
+
+
+class ComponentGeometryValidationError(ValueError):
+    """Raised when a merged draft component would contain invalid geometry."""
 
 
 COMPONENT_COPY_FIELDS = (
@@ -415,7 +420,13 @@ def update_component(
         for field in ComponentCreate.model_fields
     }
     merged.update(payload.model_dump(exclude_unset=True))
-    validated = ComponentCreate.model_validate(merged).model_dump(mode="json")
+    try:
+        validated = ComponentCreate.model_validate(merged).model_dump(mode="json")
+    except ValidationError as exc:
+        message = str(exc.errors()[0].get("msg", "Component geometry is invalid"))
+        if message.startswith("Value error, "):
+            message = message.removeprefix("Value error, ")
+        raise ComponentGeometryValidationError(message) from exc
     for field in payload.model_fields_set:
         setattr(component, field, validated[field])
     if "rotation" in payload.model_fields_set and "rotation_y" not in payload.model_fields_set:

@@ -256,6 +256,11 @@ def update_component(
         return plan_service.update_component(session, plan, component, payload)
     except plan_service.PlanNotDraftError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except plan_service.ComponentGeometryValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
 
 
 @plans_router.delete(

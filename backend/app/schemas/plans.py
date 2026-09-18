@@ -36,6 +36,80 @@ class ProfilePoint(BaseModel):
     v: PositionValue
 
 
+def _profile_cross(
+    first: ProfilePoint,
+    second: ProfilePoint,
+    third: ProfilePoint,
+) -> Decimal:
+    return (second.u - first.u) * (third.v - first.v) - (
+        second.v - first.v
+    ) * (third.u - first.u)
+
+
+def _profile_point_on_segment(
+    first: ProfilePoint,
+    second: ProfilePoint,
+    point: ProfilePoint,
+) -> bool:
+    return (
+        _profile_cross(first, second, point) == 0
+        and min(first.u, second.u) <= point.u <= max(first.u, second.u)
+        and min(first.v, second.v) <= point.v <= max(first.v, second.v)
+    )
+
+
+def _profile_segments_intersect(
+    first_start: ProfilePoint,
+    first_end: ProfilePoint,
+    second_start: ProfilePoint,
+    second_end: ProfilePoint,
+) -> bool:
+    first_cross_start = _profile_cross(first_start, first_end, second_start)
+    first_cross_end = _profile_cross(first_start, first_end, second_end)
+    second_cross_start = _profile_cross(second_start, second_end, first_start)
+    second_cross_end = _profile_cross(second_start, second_end, first_end)
+    if (
+        (first_cross_start > 0 > first_cross_end or first_cross_start < 0 < first_cross_end)
+        and (
+            second_cross_start > 0 > second_cross_end
+            or second_cross_start < 0 < second_cross_end
+        )
+    ):
+        return True
+    return (
+        _profile_point_on_segment(first_start, first_end, second_start)
+        or _profile_point_on_segment(first_start, first_end, second_end)
+        or _profile_point_on_segment(second_start, second_end, first_start)
+        or _profile_point_on_segment(second_start, second_end, first_end)
+    )
+
+
+def profile_points_form_simple_polygon(points: list[ProfilePoint]) -> bool:
+    """Return whether ordered profile edges form one non-self-intersecting loop."""
+    if len(points) < 3:
+        return False
+    for first_index, first_start in enumerate(points):
+        first_end = points[(first_index + 1) % len(points)]
+        if first_start.u == first_end.u and first_start.v == first_end.v:
+            return False
+        for second_index in range(first_index + 1, len(points)):
+            if (
+                second_index == (first_index + 1) % len(points)
+                or first_index == (second_index + 1) % len(points)
+            ):
+                continue
+            second_start = points[second_index]
+            second_end = points[(second_index + 1) % len(points)]
+            if _profile_segments_intersect(
+                first_start,
+                first_end,
+                second_start,
+                second_end,
+            ):
+                return False
+    return True
+
+
 class ComponentCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -79,6 +153,10 @@ class ComponentCreate(BaseModel):
             )
             if twice_area == 0:
                 raise ValueError("Profile points must enclose a non-zero area")
+            if not profile_points_form_simple_polygon(self.profile_points):
+                raise ValueError(
+                    "Profile points must form a simple non-self-intersecting outline"
+                )
         return self
 
 

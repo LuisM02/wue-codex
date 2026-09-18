@@ -8,7 +8,13 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.enums import ComponentType, FurnitureImageView, FurnitureType, GeometryKind
-from app.schemas.plans import PositionValue, PositiveGeometryValue, ProfilePoint, RotationValue
+from app.schemas.plans import (
+    PositionValue,
+    PositiveGeometryValue,
+    ProfilePoint,
+    RotationValue,
+    profile_points_form_simple_polygon,
+)
 
 
 class ReconstructionPartProposal(BaseModel):
@@ -58,6 +64,10 @@ class ReconstructionPartProposal(BaseModel):
             )
             if twice_area == 0:
                 raise ValueError("Profile points must enclose a non-zero area")
+            if not profile_points_form_simple_polygon(self.profile_points):
+                raise ValueError(
+                    "Profile points must form a simple non-self-intersecting outline"
+                )
         return self
 
 

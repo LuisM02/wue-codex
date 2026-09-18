@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
 
 import type { PlanComponent } from "../../../types/api";
@@ -6,10 +6,13 @@ import {
   VIEW_DEFINITIONS,
   applyProjectedPosition,
   edgeSnap,
+  insertProfilePoint,
+  longestProfileEdgeIndex,
   moveComponent,
   moveProfilePoint,
   projectComponent,
   projectionBounds,
+  removeProfilePoint,
   resizeComponent,
   type AxisGuide,
   type OrthographicView,
@@ -79,6 +82,7 @@ export function CanvasWorkspace({
 }: Props) {
   const interaction = useRef<Interaction | null>(null);
   const [guides, setGuides] = useState<AxisGuide[]>([]);
+  const [selectedProfilePoint, setSelectedProfilePoint] = useState<number | null>(null);
   const bounds = useMemo(() => projectionBounds(components, view), [components, view]);
   const spanHorizontal = Math.max(1, bounds.maxHorizontal - bounds.minHorizontal);
   const spanVertical = Math.max(1, bounds.maxVertical - bounds.minVertical);
@@ -97,9 +101,14 @@ export function CanvasWorkspace({
   const visibleGridSpacing = GRID_SPACING_MM * Math.max(1, Math.ceil(20 / Math.max(GRID_SPACING_MM * scale, 1)));
   const gridPixels = visibleGridSpacing * scale;
 
+  useEffect(() => {
+    setSelectedProfilePoint(null);
+  }, [selectedId, view]);
+
   function beginMove(event: ReactPointerEvent<SVGGElement>, component: PlanComponent) {
     event.stopPropagation();
     onSelect(component.id);
+    setSelectedProfilePoint(null);
     if (locked || event.button !== 0) return;
     const point = clientPoint(event);
     interaction.current = { type: "move", pointerId: event.pointerId, start: point, before: component };
@@ -117,6 +126,7 @@ export function CanvasWorkspace({
   function beginProfilePoint(event: ReactPointerEvent<SVGCircleElement>, component: PlanComponent, pointIndex: number) {
     event.stopPropagation();
     if (locked || event.button !== 0) return;
+    setSelectedProfilePoint(pointIndex);
     interaction.current = {
       type: "profile-point",
       pointerId: event.pointerId,
@@ -134,6 +144,7 @@ export function CanvasWorkspace({
       event.currentTarget.setPointerCapture(event.pointerId);
     } else if (event.button === 0) {
       onSelect(null);
+      setSelectedProfilePoint(null);
     }
   }
 
@@ -207,6 +218,25 @@ export function CanvasWorkspace({
   function wheel(event: ReactWheelEvent<SVGSVGElement>) {
     event.preventDefault();
     onZoom(event.deltaY < 0 ? 1 : -1);
+  }
+
+  function addOutlinePoint() {
+    if (locked || view !== "front" || !selected?.profile_points) return;
+    const edgeIndex = selectedProfilePoint ?? longestProfileEdgeIndex(selected.profile_points);
+    const after = insertProfilePoint(selected, edgeIndex);
+    if (sameGeometry(selected, after)) return;
+    onPreview(after);
+    onCommit(selected, after);
+    setSelectedProfilePoint(edgeIndex + 1);
+  }
+
+  function removeOutlinePoint(pointIndex = selectedProfilePoint) {
+    if (locked || view !== "front" || !selected || pointIndex === null) return;
+    const after = removeProfilePoint(selected, pointIndex);
+    if (sameGeometry(selected, after)) return;
+    onPreview(after);
+    onCommit(selected, after);
+    setSelectedProfilePoint(null);
   }
 
   const ordered = [...components].sort((first, second) => {
@@ -309,10 +339,24 @@ export function CanvasWorkspace({
                     cx={toScreenHorizontal(selectedProjection.horizontal + Number(point.u))}
                     cy={toScreenVertical(selectedProjection.vertical + Number(point.v))}
                     r="6"
-                    className="cad-profile-handle"
+                    className={`cad-profile-handle${selectedProfilePoint === pointIndex ? " is-active" : ""}`}
                     pointerEvents="all"
                     aria-label={`Move outline point ${pointIndex + 1}`}
+                    aria-pressed={selectedProfilePoint === pointIndex}
+                    role="button"
+                    tabIndex={0}
                     onPointerDown={(event) => beginProfilePoint(event, selected, pointIndex)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setSelectedProfilePoint(pointIndex);
+                      } else if (event.key === "Delete" || event.key === "Backspace") {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        removeOutlinePoint(pointIndex);
+                      }
+                    }}
                   />
                 ))}
                 <g className="cad-dimension" pointerEvents="none">
@@ -339,7 +383,13 @@ export function CanvasWorkspace({
           : view === "front" && selected?.profile_points
             ? "Drag round points to reshape the traced outline · square handles resize the whole part"
             : "Drag parts · drag corner handles to resize · Alt-drag or middle-drag to pan"}</span>
-        <span>{definition.horizontalLabel} horizontal · {definition.verticalLabel} vertical</span>
+        {view === "front" && selected?.profile_points && !locked ? (
+          <div className="cad-outline-actions" role="toolbar" aria-label="Traced outline points">
+            <span>{selected.profile_points.length} points</span>
+            <button type="button" onClick={addOutlinePoint} disabled={selected.profile_points.length >= 256}>＋ Add point</button>
+            <button type="button" onClick={() => removeOutlinePoint()} disabled={selectedProfilePoint === null || selected.profile_points.length <= 3}>− Remove selected</button>
+          </div>
+        ) : <span>{definition.horizontalLabel} horizontal · {definition.verticalLabel} vertical</span>}
         <span>Grid {visibleGridSpacing} mm · {snapEnabled
           ? view === "front" && selected?.profile_points
             ? `Outline snap ${OUTLINE_SNAP_MM} mm`

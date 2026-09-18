@@ -273,6 +273,45 @@ def test_finalized_plan_component_mutations_are_rejected(
     assert add.json() == update.json() == delete.json() == expected
 
 
+def test_component_update_rejects_a_self_intersecting_profile(
+    db_client: TestClient,
+) -> None:
+    furniture_id = create_furniture(db_client)
+    plan = generate_plan(db_client, furniture_id)
+    component = plan["components"][0]
+    component_url = f"/api/v1/plans/{plan['id']}/components/{component['id']}"
+    valid_profile = db_client.patch(
+        component_url,
+        json={
+            "geometry_kind": "extruded_profile",
+            "profile_points": [
+                {"u": 0, "v": 0},
+                {"u": component["width"], "v": 0},
+                {"u": component["width"], "v": component["height"]},
+                {"u": 0, "v": component["height"]},
+            ],
+        },
+    )
+    assert valid_profile.status_code == 200
+
+    crossing = db_client.patch(
+        component_url,
+        json={
+            "profile_points": [
+                {"u": 0, "v": 0},
+                {"u": component["width"], "v": component["height"]},
+                {"u": component["width"], "v": 0},
+                {"u": 0, "v": str(float(component["height"]) * 0.75)},
+            ],
+        },
+    )
+
+    assert crossing.status_code == 422
+    assert crossing.json() == {
+        "detail": "Profile points must form a simple non-self-intersecting outline"
+    }
+
+
 def test_plan_endpoints_report_missing_resources(db_client: TestClient) -> None:
     missing_id = uuid4()
     assert db_client.post(f"/api/v1/furniture/{missing_id}/plans").status_code == 404

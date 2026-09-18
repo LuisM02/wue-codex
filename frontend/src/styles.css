@@ -427,6 +427,7 @@ h1, h2, h3, strong, .button { font-family: "Manrope", "DM Sans", sans-serif; }
 .cad-resize-handle:nth-of-type(3), .cad-resize-handle:nth-of-type(4) { cursor: nesw-resize; }
 .cad-profile-handle { fill: #fff7d8; stroke: #2f6d4d; stroke-width: 2; cursor: crosshair; vector-effect: non-scaling-stroke; }
 .cad-profile-handle:hover { fill: #f5c77d; stroke: #173f2d; }
+.cad-profile-handle.is-active { fill: #ff9d62; stroke: #fff4d6; stroke-width: 3; }
 .cad-dimension line { stroke: #f0d69e; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .cad-dimension text { fill: #fff0ca; font: 700 9px "DM Sans", sans-serif; paint-order: stroke; stroke: #25302b; stroke-width: 3px; }
 .cad-dimension-arrow { fill: #f0d69e; }
@@ -435,6 +436,11 @@ h1, h2, h3, strong, .button { font-family: "Manrope", "DM Sans", sans-serif; }
 .cad-axis-indicator text { fill: #d6dfda; font: 700 9px "Manrope", sans-serif; }
 .cad-view-title { fill: #d0dbd5; font: 700 8px "Manrope", sans-serif; letter-spacing: 1.2px; }
 .cad-statusbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 10px; overflow: hidden; border-top: 1px solid #435049; background: #1d2723; color: #aebbb4; font-size: 7px; white-space: nowrap; }
+.cad-outline-actions { display: flex; align-items: center; gap: 6px; }
+.cad-outline-actions > span { color: #d7e3dc; font-weight: 700; }
+.cad-outline-actions button { padding: 3px 6px; border: 1px solid #61736a; border-radius: 3px; background: #31423a; color: #e1ebe5; font: 700 7px "DM Sans", sans-serif; }
+.cad-outline-actions button:hover:not(:disabled) { border-color: #e4bd72; background: #475b51; color: white; }
+.cad-outline-actions button:disabled { opacity: .4; }
 .cad-properties--empty { display: grid; place-items: center; align-content: center; gap: 7px; padding: 20px; color: #78817c; text-align: center; }
 .cad-properties--empty > span { font-size: 28px; }
 .cad-properties--empty strong { color: #4d5952; font-size: 10px; }

@@ -96,3 +96,17 @@ def test_extruded_profile_requires_a_real_outline_inside_part_bounds() -> None:
             "geometry_kind": "extruded_profile",
             "profile_points": [{"u": 0, "v": 0}, {"u": 600, "v": 0}, {"u": 0, "v": 20}],
         })
+
+
+def test_extruded_profile_rejects_a_self_intersecting_outline() -> None:
+    with pytest.raises(ValidationError, match="non-self-intersecting"):
+        ComponentCreate.model_validate({
+            **valid_component(),
+            "geometry_kind": "extruded_profile",
+            "profile_points": [
+                {"u": 0, "v": 0},
+                {"u": 500, "v": 20},
+                {"u": 500, "v": 0},
+                {"u": 0, "v": 15},
+            ],
+        })

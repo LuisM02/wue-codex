@@ -77,6 +77,67 @@ function positiveDecimal(value: number): string {
   return decimal(Math.max(0.0001, value));
 }
 
+type NumericPoint = { u: number; v: number };
+
+function cross(first: NumericPoint, second: NumericPoint, third: NumericPoint): number {
+  return (second.u - first.u) * (third.v - first.v)
+    - (second.v - first.v) * (third.u - first.u);
+}
+
+function onSegment(first: NumericPoint, second: NumericPoint, point: NumericPoint): boolean {
+  const epsilon = 0.0000001;
+  return Math.abs(cross(first, second, point)) <= epsilon
+    && point.u >= Math.min(first.u, second.u) - epsilon
+    && point.u <= Math.max(first.u, second.u) + epsilon
+    && point.v >= Math.min(first.v, second.v) - epsilon
+    && point.v <= Math.max(first.v, second.v) + epsilon;
+}
+
+function segmentsIntersect(
+  firstStart: NumericPoint,
+  firstEnd: NumericPoint,
+  secondStart: NumericPoint,
+  secondEnd: NumericPoint,
+): boolean {
+  const firstCrossStart = cross(firstStart, firstEnd, secondStart);
+  const firstCrossEnd = cross(firstStart, firstEnd, secondEnd);
+  const secondCrossStart = cross(secondStart, secondEnd, firstStart);
+  const secondCrossEnd = cross(secondStart, secondEnd, firstEnd);
+  if (((firstCrossStart > 0 && firstCrossEnd < 0) || (firstCrossStart < 0 && firstCrossEnd > 0))
+    && ((secondCrossStart > 0 && secondCrossEnd < 0) || (secondCrossStart < 0 && secondCrossEnd > 0))) {
+    return true;
+  }
+  return onSegment(firstStart, firstEnd, secondStart)
+    || onSegment(firstStart, firstEnd, secondEnd)
+    || onSegment(secondStart, secondEnd, firstStart)
+    || onSegment(secondStart, secondEnd, firstEnd);
+}
+
+export function isValidProfilePoints(points: Array<{ u: string; v: string }>): boolean {
+  if (points.length < 3 || points.length > 256) return false;
+  const numericPoints = points.map((point) => ({ u: numeric(point.u), v: numeric(point.v) }));
+  const doubledArea = Math.abs(numericPoints.reduce((sum, point, index) => {
+    const next = numericPoints[(index + 1) % numericPoints.length];
+    return sum + point.u * next.v - next.u * point.v;
+  }, 0));
+  if (doubledArea < 0.0002) return false;
+  for (let firstIndex = 0; firstIndex < numericPoints.length; firstIndex += 1) {
+    const firstStart = numericPoints[firstIndex];
+    const firstEnd = numericPoints[(firstIndex + 1) % numericPoints.length];
+    if (firstStart.u === firstEnd.u && firstStart.v === firstEnd.v) return false;
+    for (let secondIndex = firstIndex + 1; secondIndex < numericPoints.length; secondIndex += 1) {
+      const adjacent = secondIndex === firstIndex
+        || secondIndex === (firstIndex + 1) % numericPoints.length
+        || firstIndex === (secondIndex + 1) % numericPoints.length;
+      if (adjacent) continue;
+      const secondStart = numericPoints[secondIndex];
+      const secondEnd = numericPoints[(secondIndex + 1) % numericPoints.length];
+      if (segmentsIntersect(firstStart, firstEnd, secondStart, secondEnd)) return false;
+    }
+  }
+  return true;
+}
+
 export function projectComponent(
   component: PlanComponent,
   view: OrthographicView,
@@ -280,12 +341,48 @@ export function moveProfilePoint(
   const points = component.profile_points.map((point, index) => index === pointIndex
     ? { u: decimal(u), v: decimal(v) }
     : point);
-  const doubledArea = Math.abs(points.reduce((sum, point, index) => {
-    const next = points[(index + 1) % points.length];
-    return sum + numeric(point.u) * numeric(next.v) - numeric(next.u) * numeric(point.v);
-  }, 0));
-  if (doubledArea < 0.0002) return component;
+  if (!isValidProfilePoints(points)) return component;
   return { ...component, profile_points: points };
+}
+
+export function longestProfileEdgeIndex(points: Array<{ u: string; v: string }>): number {
+  if (!points.length) return -1;
+  let longestIndex = 0;
+  let longestSquaredLength = -1;
+  points.forEach((point, index) => {
+    const next = points[(index + 1) % points.length];
+    const deltaU = numeric(next.u) - numeric(point.u);
+    const deltaV = numeric(next.v) - numeric(point.v);
+    const squaredLength = deltaU * deltaU + deltaV * deltaV;
+    if (squaredLength > longestSquaredLength) {
+      longestIndex = index;
+      longestSquaredLength = squaredLength;
+    }
+  });
+  return longestIndex;
+}
+
+export function insertProfilePoint(component: PlanComponent, afterIndex: number | null): PlanComponent {
+  const points = component.profile_points;
+  if (component.geometry_kind !== "extruded_profile" || !points || points.length >= 256) return component;
+  const edgeIndex = afterIndex === null ? longestProfileEdgeIndex(points) : afterIndex;
+  if (edgeIndex < 0 || edgeIndex >= points.length) return component;
+  const point = points[edgeIndex];
+  const next = points[(edgeIndex + 1) % points.length];
+  const inserted = {
+    u: decimal((numeric(point.u) + numeric(next.u)) / 2),
+    v: decimal((numeric(point.v) + numeric(next.v)) / 2),
+  };
+  const profilePoints = [...points.slice(0, edgeIndex + 1), inserted, ...points.slice(edgeIndex + 1)];
+  return isValidProfilePoints(profilePoints) ? { ...component, profile_points: profilePoints } : component;
+}
+
+export function removeProfilePoint(component: PlanComponent, pointIndex: number): PlanComponent {
+  const points = component.profile_points;
+  if (component.geometry_kind !== "extruded_profile" || !points || points.length <= 3
+    || pointIndex < 0 || pointIndex >= points.length) return component;
+  const profilePoints = points.filter((_, index) => index !== pointIndex);
+  return isValidProfilePoints(profilePoints) ? { ...component, profile_points: profilePoints } : component;
 }
 
 export function nextShelfName(components: PlanComponent[]): string {

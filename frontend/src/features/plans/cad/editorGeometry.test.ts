@@ -5,10 +5,14 @@ import { EditorHistory } from "./editorHistory";
 import {
   canMutatePlan,
   edgeSnap,
+  insertProfilePoint,
+  isValidProfilePoints,
+  longestProfileEdgeIndex,
   moveComponent,
   moveProfilePoint,
   nextShelfName,
   projectComponent,
+  removeProfilePoint,
   resizeComponent,
   screenDeltaToWorld,
   snapToGrid,
@@ -118,6 +122,47 @@ describe("orthographic CAD geometry", () => {
     };
     const moved = moveProfilePoint(profile, 2, 80, 22, 1, 25);
     expect(moved.profile_points?.[2]).toEqual({ u: "450", v: "25" });
+  });
+
+  it("inserts a point after the selected vertex or on the longest edge", () => {
+    const profile = {
+      ...component,
+      geometry_kind: "extruded_profile" as const,
+      profile_points: [
+        { u: "0", v: "0" },
+        { u: "450", v: "0" },
+        { u: "450", v: "40" },
+        { u: "0", v: "40" },
+      ],
+    };
+    expect(longestProfileEdgeIndex(profile.profile_points)).toBe(0);
+    expect(insertProfilePoint(profile, null).profile_points?.[1]).toEqual({ u: "225", v: "0" });
+    expect(insertProfilePoint(profile, 1).profile_points?.[2]).toEqual({ u: "450", v: "20" });
+  });
+
+  it("removes only a safe vertex and retains at least three points", () => {
+    const profile = {
+      ...component,
+      geometry_kind: "extruded_profile" as const,
+      profile_points: [
+        { u: "0", v: "0" },
+        { u: "450", v: "0" },
+        { u: "450", v: "40" },
+        { u: "0", v: "40" },
+      ],
+    };
+    const triangle = removeProfilePoint(profile, 2);
+    expect(triangle.profile_points).toHaveLength(3);
+    expect(removeProfilePoint(triangle, 1)).toEqual(triangle);
+  });
+
+  it("rejects self-intersecting traced outlines", () => {
+    expect(isValidProfilePoints([
+      { u: "0", v: "0" },
+      { u: "450", v: "40" },
+      { u: "450", v: "0" },
+      { u: "0", v: "30" },
+    ])).toBe(false);
   });
 
   it("chooses the next missing valid shelf number", () => {
