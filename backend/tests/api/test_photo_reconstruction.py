@@ -1,6 +1,7 @@
 """PostgreSQL/filesystem tests for photo-derived part reconstruction."""
 
 from decimal import Decimal
+from dataclasses import replace
 from uuid import uuid4
 
 import pytest
@@ -13,8 +14,54 @@ from app.main import app
 from app.schemas.photo_reconstruction import ReconstructionPartProposal
 from app.services.photo_reconstruction import ReconstructionPrediction
 from app.services.http_reconstruction import HttpFurnitureReconstructor
+from tests.support.photo_reconstruction import TemplateTestReconstructor
 
 pytestmark = pytest.mark.integration
+
+
+@pytest.mark.parametrize("geometry_kind", ["box", "extruded_profile"])
+def test_photo_pose_survives_plan_review_and_finalized_3d(db_client, image_bytes_factory, geometry_kind):
+    """Synthetic persistence contract test, not measured chair accuracy."""
+    furniture_id, _ = create_ready_furniture(db_client, image_bytes_factory)
+
+    class TiltedTestReconstructor(TemplateTestReconstructor):
+        def reconstruct(self, images, furniture_type, dimensions):
+            prediction = super().reconstruct(images, furniture_type, dimensions)
+            parts = []
+            for part in prediction.parts:
+                if part.component_name == "backrest":
+                    profile = [
+                        {"u": "0", "v": "0"}, {"u": str(part.width), "v": "0"},
+                        {"u": str(part.width), "v": str(part.height)}, {"u": "0", "v": str(part.height)},
+                    ] if geometry_kind == "extruded_profile" else None
+                    part = ReconstructionPartProposal.model_validate({
+                        **part.model_dump(), "rotation_x": "8.5062",
+                        "geometry_kind": geometry_kind, "profile_points": profile,
+                    })
+                parts.append(part)
+            return replace(prediction, parts=tuple(parts))
+
+    app.dependency_overrides[get_furniture_reconstructor] = TiltedTestReconstructor
+    analysis_response = db_client.post(f"/api/v1/furniture/{furniture_id}/reconstruction")
+    assert analysis_response.status_code == 200, analysis_response.text
+    source = next(part for part in analysis_response.json()["parts"] if part["component_name"] == "backrest")
+    draft_response = db_client.post(f"/api/v1/furniture/{furniture_id}/plans")
+    assert draft_response.status_code == 201, draft_response.text
+    draft = draft_response.json()
+    component = next(part for part in draft["components"] if part["component_name"] == "backrest")
+    assert component["rotation_x"] == source["rotation_x"] == "8.5062"
+    assert component["profile_points"] == source["profile_points"]
+    assert component["source_reconstruction_part_id"] == source["id"]
+    assert db_client.get(f"/api/v1/plans/{draft['id']}/geometry-3d").status_code == 409
+    assert db_client.post(f"/api/v1/plans/{draft['id']}/finalize").status_code == 409
+    assert db_client.post(f"/api/v1/plans/{draft['id']}/review-parts").status_code == 200
+    assert db_client.post(f"/api/v1/plans/{draft['id']}/finalize").status_code == 200
+    geometry_response = db_client.get(f"/api/v1/plans/{draft['id']}/geometry-3d")
+    assert geometry_response.status_code == 200, geometry_response.text
+    rendered = next(part for part in geometry_response.json()["components"] if part["component_name"] == "backrest")
+    assert rendered["rotation"]["x"] == "8.5062"
+    assert rendered["profile_points"] == source["profile_points"]
+    assert rendered["geometry_kind"] == geometry_kind
 
 
 @pytest.mark.parametrize("worker_status,payload,api_status", [

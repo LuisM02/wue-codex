@@ -1,6 +1,66 @@
 # WUE prototype checkpoint — October 1, 2026
 
-## Latest CAD part-by-part inspection checkpoint
+## Latest two-side chair lean checkpoint
+
+- IMPLEMENTED: `reconstruction-worker/wue_worker/chair_pose.py` fits a straight
+  backrest centerline only when mirrored Left and Right silhouettes agree.
+  Stable contiguous row coverage, width stability, residual, angle (up to18°),
+  cross-view angle/placement and rotated overall-bound checks are required.
+  Effectively upright evidence gets no cosmetic rotation. Failure preserves
+  upright geometry and adds a review warning; it never partially tilts/clips
+  an assembly or substitutes a standard chair.
+- IMPLEMENTED: eligible detected `left_backrest_post`, `right_backrest_post`
+  and `backrest_slat_*` receive `rotation_x`. Their center-pivot geometry keeps
+  the previous front-view vertical envelope and side-row cross-section; local
+  X/Y profile points rescale with the adjusted height. The existing 2D/3D pose
+  convention remains the source-of-truth rule. Top rail (`backrest`), legs,
+  seat and aprons do not receive automatic tilt. Rail/leg connections need review.
+- PARTIALLY IMPLEMENTED reconstruction fidelity: the actual supplied slatted
+  chair's SAM analysis estimates **8.5062°** on eight of18 parts. Approximate
+  overall450 × 900 × 500mm scale and unrectified views do not establish a physical
+  angle. Post/slat depth is still an overlapping envelope (about99.8mm), not
+  measured stock; seat thickness, curved rail, rear legs and joinery remain
+  provisional. This is not training, exact reconstruction or measured accuracy.
+- Separate test copy: furniture `a60d1aa5-6b5f-4f73-8d9c-8bacb1b6d1d0`, name
+  `Slatted chair two-side lean test (approx. size)`, plan
+  `74eeae5f-8cde-4833-8893-53ee5d753776`, **draft,18 parts,
+  parts_reviewed_at null**. All five photo checksums matched the retained chair
+  before copying its four front/back/left/right display alignments to the new
+  copy only. Top alignment was not copied. Alignment is display metadata, not
+  camera calibration or new geometry evidence. Existing copies were not rebuilt.
+- Fresh regression: **backend379 passed, no warnings; frontend85 passed across
+  12 files; worker56 passed** with two existing Starlette/AnyIO deprecations.
+  Production build passed with the existing852.86kB lazy 3D viewer warning.
+  Backend tests verify box/profile poses and source IDs survive proposal→draft→
+  user review→finalized3D, and draft3D/unreviewed finalization remain blocked.
+  Those approval actions occur only in disposable test databases, not live demos.
+- Live checks: new chair Side view shows the8.5062° tilt in Properties and uses
+  the existing rotated-part projected-bound annotations/handle restrictions.
+  Left/Right comparison and zoom work without geometry edits or review. It is
+  left on Right photo, selected left backrest post,144%zoom. Screenshot outside
+  Git: `C:\Users\Luis Mendoza\Documents\ChatGPT\wue codex edition\wue-chair-two-side-lean.jpg`.
+  Readback confirms draft/null review and eight tilted parts. Actual read-only
+  table/bookshelf SAM probes still return nine parts each and verify saved
+  plans unchanged; confidence/part counts are not accuracy percentages.
+- Retained finalized table plan `3d7942f9-601e-4e34-a983-d530f79f0e6e`, both
+  finalized18-part chair plans, original six-part bookshelf and unreviewed
+  nine-part bookshelf are preserved. Sample quote
+  `958c2049-e1f2-4cc8-9cc7-1e0ea54c4021` still totals5,831.51 at display precision,
+  with sample wood100/board_ft, screw2/piece and labor150/hour. No currency,
+  supplier-price accuracy, manufacturing safety or waste/nesting claims added.
+- Services began stopped; the existing launcher started worker8010, API8011
+  and frontend5174 without migrations, installations, resets or terminating
+  unrelated processes. API/database/proxy/SAM GPU readiness passed. Whole-PC
+  reboot recovery remains untested. No schema, endpoints, dependencies or
+  pricing rules changed; the probe script now reports `part_poses` as well.
+
+Next defense priorities: the user reviews/corrects new draft stock dimensions,
+depths and rail/leg connections; only the user confirms/finalizes when satisfied.
+Rehearse the retained table's finalized2D→3D→BOM→sample quote, prepare separate
+local database/uploads backups, and present assisted reconstruction honestly.
+This checkpoint does not claim the whole defense preparation is finished.
+
+## Preceding CAD part-by-part inspection checkpoint
 
 - IMPLEMENTED: photo-derived drawings show a part-by-part guide. Previous/Next
   follows the current component list without wrapping; no selection can restart

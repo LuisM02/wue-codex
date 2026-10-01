@@ -59,6 +59,7 @@ def main() -> None:
             "provider": proposal["provider_name"],
             "proposed_parts": [part["component_name"] for part in proposal["parts"]],
             "part_sizes_mm": [{key: part[key] for key in ("component_name", "width", "height", "depth")} for part in proposal["parts"]],
+            "part_poses": [{key: part[key] for key in ("component_name", "x", "y", "z", "rotation_x", "rotation_y", "rotation_z")} for part in proposal["parts"]],
             "warnings": proposal["warnings"],
             "saved_plans_unchanged": True,
             "accuracy_verified": False,

@@ -3,7 +3,18 @@
 Latest verified prototype checkpoint and remaining limits:
 [October 1, 2026 checkpoint](docs/PROTOTYPE_CHECKPOINT_2026-10-01.md).
 
-Latest CAD review follow-on: photo-derived drawings have Previous/Next part
+Latest chair pose follow-on: agreeing mirrored-left/right silhouette centerlines
+can now estimate a conservative straight lean for detected backrest posts/slats.
+Unstable, conflicting, excessive or out-of-bounds fits keep the original upright
+proposal with an explicit warning. The supplied slatted chair yields about8.5°
+in a **separate unreviewed approximate-size draft**; the top rail and rear legs
+are not automatically tilted. This is a projected estimate, not a measured
+physical angle or validated reconstruction accuracy. **Fresh backend379,
+frontend85 and worker56 tests pass; production build passes.** Retained table,
+chair, bookshelf and sample-price quotation remain preserved. Curvature,
+overlapping stock depth and physical accuracy evaluation are still incomplete.
+
+Preceding CAD review follow-on: photo-derived drawings have Previous/Next part
 navigation, available Front/Back–Left/Right–Top photo comparison buttons, and
 a display-only selected-part isolation toggle. Plain-language part checks and
 model-size/confidence reminders support review without recording it for the

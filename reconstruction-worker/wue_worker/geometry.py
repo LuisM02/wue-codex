@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from statistics import median
 
 from .imaging import AnalyzedView
+from .chair_pose import apply_backrest_lean, fit_backrest_lean
 from .schemas import PartProposal, ProfilePoint, ReconstructionResponse
 
 
@@ -772,12 +773,29 @@ def _chair(
     warnings = [
         "Hidden joinery and occluded rear surfaces are inferred; verify them in the part editor",
         "Chair front/back placement uses the right-side photograph; mirror the left reference overlay when comparing the Side view",
-        "Backrest/slat depths use median side-view row spans at each height, not verified timber thicknesses; lean and curvature are still approximated by straight extrusions",
+        "Backrest/slat depths use side-view row envelopes, not verified timber thicknesses; curved and overlapping members remain straight-extrusion approximations",
         "Seat thickness remains a perspective-projected band; visible apron bands are separated but flush or hidden aprons may require manual correction",
         "Paired side aprons and occluded member thicknesses assume symmetry; verify against both side photographs",
         "Seat, backrest, posts, legs, and visible stretchers are separated from the photographed silhouette; confirm overlapping rails before manufacture",
         "Front/back and left/right labels assume the photographs were placed in the requested slots",
     ]
+    lean = fit_backrest_lean(
+        views, back_bottom / front.object_height, seat_top / front.object_height,
+        height, depth,
+    )
+    tilted = apply_backrest_lean(parts, lean, height, depth) if lean is not None else None
+    if tilted is not None:
+        parts = tilted
+        warnings.append(
+            "Backrest posts/slats use a straight projected lean supported by both mirrored-left and right silhouettes; "
+            "the supplied scale and unrectified photos do not establish a measured physical angle. "
+            "Top rail and rear legs are not automatically tilted; verify their connections."
+        )
+    else:
+        warnings.append(
+            "Backrest lean was not fitted: both side silhouettes must agree on a stable centerline within the supplied bounds; "
+            "verify tilt manually rather than treating upright proposals as measured."
+        )
     return parts, warnings
 
 

@@ -1,6 +1,26 @@
 # WUE implementation roadmap
 
-October 1 CAD review follow-on (newest): photo-derived plans now have an
+October 1 chair pose follow-on (newest): stable mirrored-left and right side
+silhouettes must agree on backrest centerline angle and placement before fitting
+straight posts/slats. Fits over18°, inconsistent angles, wide/split/unreliable
+envelopes and rotated assemblies outside overall bounds are rejected together;
+no cosmetic tilt is inserted for effectively upright evidence. Existing local
+profile coordinates are rescaled for the center-pivot pose. Top rail/rear legs
+remain unchanged and their connections explicitly require review. This is an
+unrectified projected approximation, not a verified physical lean or stock size.
+The supplied chair produces8.5062° for eight of18 parts in a separate approved
+450 × 900 × 500mm test draft. Retained finalized demos and sample quotation are
+preserved. The new draft remains unreviewed; no agent finalization was performed.
+Fresh backend379/frontend85/worker56 pass; frontend build passes. Existing two
+worker deprecations and852.86kB lazy-viewer warning remain. Live SAM probes,
+Side-view photo comparison and startup from stopped services passed; this is
+not a whole-PC reboot test. No schema, endpoint, dependency or training changes.
+Next: user reviews the new chair and bookshelf drafts, corrects stock/depth and
+rail/leg connections, and confirms/finalizes only when satisfied. Keep the
+retained table as the primary end-to-end defense demo; rehearse 2D→3D→BOM→quote,
+prepare local data/upload backups and explain approximate size/sample prices.
+
+October 1 CAD review follow-on (preceding): photo-derived plans now have an
 inspection guide with bounded Previous/Next selection, supplied-photo view
 shortcuts, selected-part isolation and plain-language bookshelf checks. Isolation
 retains full-furniture bounds, photo alignment and hidden component data; it is
