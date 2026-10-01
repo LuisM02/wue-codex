@@ -9,7 +9,8 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image, ImageDraw, ImageOps
 
-from wue_worker.imaging import analyze_image
+from wue_worker.geometry import _dining_table
+from wue_worker.imaging import ImageSetRejected, analyze_image, validate_view_set
 from wue_worker.main import app
 from wue_worker.segmentation import (
     BaselineSegmentationProvider,
@@ -81,16 +82,24 @@ def _chair_image(view: str, *, variant: int = 0) -> bytes:
 def _table_image(
     view: str, *, aprons: bool = True, side_aprons: bool | None = None,
     inset: int = 0, small_overhang: bool = False, side_apron_height: int = 20,
+    front_surface_projection: int | None = None,
 ) -> bytes:
     image = Image.new("RGB", (280, 240), "#f7f5ef")
     draw = ImageDraw.Draw(image)
     wood = "#68412b"
     if view in {"front", "back"}:
-        draw.rounded_rectangle((25, 40, 255, 66), radius=7, fill=wood)
+        support_start = 62
+        if front_surface_projection is None:
+            draw.rounded_rectangle((25, 40, 255, 66), radius=7, fill=wood)
+        else:
+            slab_edge = 40 + front_surface_projection
+            draw.polygon([(85, 40), (195, 40), (255, slab_edge), (25, slab_edge)], fill=wood)
+            draw.rectangle((25, slab_edge, 255, slab_edge + 5), fill=wood)
+            support_start = slab_edge + 3
         if aprons:
-            draw.rectangle((27, 62, 253, 82) if small_overhang else (48 + inset, 62, 232 - inset, 82), fill=wood)
-        draw.polygon([(48 + inset, 62), (73 + inset, 62), (68 + inset, 218), (54 + inset, 218)], fill=wood)
-        draw.polygon([(207 - inset, 62), (232 - inset, 62), (226 - inset, 218), (212 - inset, 218)], fill=wood)
+            draw.rectangle((27, support_start, 253, support_start + 20) if small_overhang else (48 + inset, support_start, 232 - inset, support_start + 20), fill=wood)
+        draw.polygon([(48 + inset, support_start), (73 + inset, support_start), (68 + inset, 218), (54 + inset, 218)], fill=wood)
+        draw.polygon([(207 - inset, support_start), (232 - inset, support_start), (226 - inset, 218), (212 - inset, 218)], fill=wood)
     elif view in {"left", "right"}:
         draw.rounded_rectangle((55, 40, 205, 66), radius=7, fill=wood)
         if (aprons if side_aprons is None else side_aprons):
@@ -250,7 +259,7 @@ def test_perspective_visible_extra_legs_do_not_reject_a_supported_chair(client):
 
 
 def test_health_and_model_status_are_honest(client: TestClient) -> None:
-    assert client.get("/health").json()["version"] == "0.3.0"
+    assert client.get("/health").json()["version"] == "0.3.1"
     status = client.get("/v1/model-status").json()
     assert status["ready"] is True
     assert status["uses_gpu"] is False
@@ -343,6 +352,7 @@ def test_worker_classifies_and_reconstructs_a_photo_derived_chair(
     assert response.status_code == 200, response.text
     body = response.json()
     names = [part["component_name"] for part in body["parts"]]
+    assert body["provider_version"] == "0.3.1"
     assert names[:2] == ["seat", "backrest"]
     assert {
         "front_left_leg",
@@ -550,6 +560,59 @@ def test_side_apron_height_comes_from_its_own_view(client: TestClient) -> None:
         proposals.append({part["component_name"]: part for part in response.json()["parts"]})
     assert proposals[1]["left_apron"]["height"] > proposals[0]["left_apron"]["height"] + 40
     assert proposals[1]["front_apron"]["height"] == proposals[0]["front_apron"]["height"]
+
+
+def test_front_perspective_does_not_reposition_side_aprons() -> None:
+    # Isolate coordinate mapping from the separate conservative recognition gate.
+    # This fixture exercises different projected elevations, not AI accuracy.
+    proposals = []
+    for projection in (26, 50):
+        views = {name: analyze_image(name, _table_image(
+            name, front_surface_projection=projection,
+        )) for name in VIEWS}
+        parts, _ = _dining_table(views, 1800, 750, 900)
+        proposals.append({part.component_name: part.model_dump() for part in parts})
+    assert len(proposals[0]) == len(proposals[1]) == 9
+    assert proposals[0]["front_apron"]["height"] != proposals[1]["front_apron"]["height"]
+    for name in ("left_apron", "right_apron"):
+        for key in ("y", "height", "z", "depth"):
+            assert proposals[0][name][key] == proposals[1][name][key]
+
+
+def test_wrong_table_scale_reports_proportion_mismatch_not_confirmed_orientation(client: TestClient) -> None:
+    files, manifest = _files_for(_table_image)
+    response = client.post("/v1/reconstruct", files=files, data={
+        "furniture_type": "dining_table", "width_mm": "150",
+        "height_mm": "900", "depth_mm": "500",
+        "image_manifest": json.dumps(manifest),
+    })
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert "front photo proportions" in detail
+    assert "overall dimensions" in detail
+    assert "cannot determine which is wrong" in detail
+    assert "wrong orientation" not in detail
+    # The same photos with a plausible scale still pass; no generic fallback.
+    response = client.post("/v1/reconstruct", files=files, data={
+        "furniture_type": "dining_table", "width_mm": "1800",
+        "height_mm": "750", "depth_mm": "900",
+        "image_manifest": json.dumps(manifest),
+    })
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.parametrize("dimensions, rejected", [
+    ((150, 750, 900), True),  # More than fourfold front aspect mismatch.
+    ((380, 750, 500), False),  # Warning threshold, but not rejection.
+])
+def test_proportion_gate_thresholds_are_preserved(dimensions, rejected) -> None:
+    views = {name: analyze_image(name, _table_image(name)) for name in VIEWS}
+    if rejected:
+        with pytest.raises(ImageSetRejected, match="front photo proportions"):
+            validate_view_set(views, dimensions)
+    else:
+        warnings = validate_view_set(views, dimensions)
+        assert "The front perspective differs strongly from the supplied dimensions" in warnings
 
 
 def test_neural_box_mask_cannot_fill_open_table_space() -> None:

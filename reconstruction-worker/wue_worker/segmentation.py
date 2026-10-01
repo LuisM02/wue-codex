@@ -14,6 +14,8 @@ from typing import Protocol
 
 from PIL import Image
 
+from . import __version__
+
 
 class SegmentationUnavailable(RuntimeError):
     """Raised when a configured neural segmenter cannot safely run."""
@@ -50,7 +52,7 @@ class BaselineSegmentationProvider:
     """Preserve the dependency-light foreground mask used in version 0.1."""
 
     provider_name = "wue-five-view-silhouette"
-    provider_version = "0.3.0"
+    provider_version = __version__
     classifier_name = "wue-image-structure"
     reconstruction_warning = (
         "This local pipeline traces real silhouettes but does not yet run SAM 2 "
@@ -116,7 +118,7 @@ class Sam2SegmentationProvider:
             if self._checkpoint_sha256 is not None
             else ""
         )
-        return f"0.3.0/{checkpoint_name}{digest}"
+        return f"{__version__}/{checkpoint_name}{digest}"
 
     @staticmethod
     def _furniture_prompt_box(

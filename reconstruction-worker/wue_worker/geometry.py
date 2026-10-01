@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from statistics import median
 
+from . import __version__
 from .imaging import AnalyzedView
 from .chair_pose import apply_backrest_lean, fit_backrest_lean
 from .schemas import PartProposal, ProfilePoint, ReconstructionResponse
@@ -837,7 +838,7 @@ def _dining_table(
     views: dict[str, AnalyzedView], width: float, height: float, depth: float
 ) -> tuple[list[PartProposal], list[str]]:
     front, side = views["front"], views["left"]
-    top_start, top_stop, _ = _strongest_band(front, 0.02, 0.42)
+    _, top_stop, _ = _strongest_band(front, 0.02, 0.42)
     tabletop_projection = trace_region(
         front, 0, 0, front.object_width, top_stop, width, height
     )
@@ -869,13 +870,10 @@ def _dining_table(
         top_thickness / tabletop_projection.height,
         y=underside_height,
     )
-    side_top_start = round(
-        top_start / front.object_height * side.object_height
-    )
-    side_top_stop = max(
-        side_top_start + 1,
-        round(top_stop / front.object_height * side.object_height),
-    )
+    # Perspective differs between elevations. Locate the side's own projected
+    # slab band instead of transplanting the front's pixel-height fraction.
+    # Both elevations map their underside to the same provisional model height.
+    side_top_start, side_top_stop, _ = _strongest_band(side, 0.02, 0.42)
     top_depth, top_z = _depth_geometry(
         side, side_top_start, side_top_stop, depth
     )
@@ -894,10 +892,7 @@ def _dining_table(
     # Sample below the apron: averaging the entire underside joins otherwise
     # distinct legs into one wide support on photographed dining tables.
     front_spans = _chair_leg_regions(front, top_stop)
-    side_start = min(
-        side.object_height - 1,
-        round(top_stop / front.object_height * side.object_height),
-    )
+    side_start = min(side.object_height - 1, side_top_stop)
     depth_spans = _chair_leg_regions(side, side_start)
     order = 1
     x_labels = ["left", "right"] if len(front_spans) == 2 else ["center"]
@@ -1322,7 +1317,7 @@ def reconstruct(
     depth: float,
     input_warnings: list[str],
     provider_name: str = "wue-five-view-silhouette",
-    provider_version: str = "0.3.0",
+    provider_version: str = __version__,
     pipeline_warning: str = (
         "This local pipeline traces real silhouettes but does not yet run SAM 2 "
         "or dense multi-view depth"

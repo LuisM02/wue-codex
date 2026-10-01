@@ -339,7 +339,9 @@ def validate_view_set(
             mismatch = abs(math.log(max(observed, 1e-6) / max(ratio, 1e-6)))
             if mismatch > math.log(4.0):
                 raise ImageSetRejected(
-                    f"The {name} photograph has the wrong orientation for its labeled view"
+                    f"The {name} photo proportions differ strongly from the entered "
+                    "width, height and depth. Check the overall dimensions, labeled "
+                    "view and camera angle. This check cannot determine which is wrong"
                 )
             if mismatch > math.log(2.1):
                 warnings.append(

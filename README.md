@@ -1,5 +1,24 @@
 # WUE Furniture Workshop
 
+Latest table-mapping revision (October 2, 2026): the worker now locates the
+side elevation's own projected tabletop band instead of reusing the front
+photo's height fraction. Side leg sampling and apron mapping use that boundary;
+the independently traced apron height is retained rather than snapping an
+existing part into place. Severe aspect-ratio mismatches still return HTTP422,
+but the message now identifies a photo/dimension proportion mismatch instead
+of claiming a confirmed wrong orientation. Thresholds and recognition gates
+are unchanged. Worker/provider provenance is now **0.3.1**; saved records keep
+their original provenance. **66 worker tests and 15 focused backend HTTP-adapter
+tests pass.** A read-only live SAM probe of the existing table photos retained
+nine proposed parts and reduced the new proposal's side-apron gap from about
+17.62 mm to 0 mm. This is not physical accuracy validation. No saved plan was
+replaced or finalized; two independently observed position edits in the audit
+draft were preserved. Protected retained designs and the sample quote still
+match their checkpoint. Frontend/full backend suites and the build were not
+rerun for this worker-only change (last verified: 115 frontend, 381 backend,
+build passing with the existing large viewer-chunk warning).
+See [table mapping checkpoint](docs/TABLE_MAPPING_CHECKPOINT_2026-10-02.md).
+
 Latest editor-cleanup revision (October 2, 2026): part-by-part navigation stays
 visible, while detailed review instructions, sizes and photo-comparison buttons
 are collapsed under **Review help & photo comparison**. The required review and
