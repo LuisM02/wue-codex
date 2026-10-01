@@ -1,5 +1,17 @@
 # WUE implementation roadmap
 
+October 1 failure-feedback follow-on (newest): worker input rejection now maps
+to API422 through separate domain exceptions, not an invalid-output502. Worker
+configuration/busy/unavailable faults remain503; malformed results/errors remain
+502. Transport timeouts have explicit bounded reasons. UI retains the worker
+reason with corrective/service guidance and no longer claims the connected
+provider is absent. Manual selection stays a clearly labeled testing action,
+not an AI result or reconstruction substitute. Fresh backend377/frontend65/build
+pass; worker42 remains unchanged latest prior observation. Regression verifies
+failed requests leave saved recognition, analysis and plans unchanged. API alone
+reloaded; five retained plan statuses and sample quote checked read-only. No
+new geometry, training, dependencies, endpoints, schema or pricing changes.
+
 October 1 bookshelf follow-on (latest): implemented a solid-back internal-edge
 path with bounded, coherent opposite-contrast shelf faces; stable frame bounds
 prevent a bottom leg fragment becoming a narrow bottom panel. Removed the guessed

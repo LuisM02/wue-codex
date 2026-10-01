@@ -42,6 +42,8 @@ def reconstruct_furniture(
         )
     except reconstruction_service.ReconstructionPrerequisiteError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except reconstruction_service.ReconstructionInputRejectedError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
     except reconstruction_service.ReconstructionProviderUnavailableError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)

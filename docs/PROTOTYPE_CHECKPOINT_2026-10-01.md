@@ -1,5 +1,38 @@
 # WUE prototype checkpoint — October 1, 2026
 
+## Latest photo-analysis failure feedback
+
+The local worker was already returning bounded text details, but its photo
+rejections were labeled API502, and the photo UI incorrectly described every
+503 as an unconnected provider. This follow-on corrects that distinction.
+
+- New domain exceptions: `ClassificationInputRejectedError` and
+  `ReconstructionInputRejectedError`. Worker400/422 with valid text details
+  become API422. Invalid/malformed worker output or rejection details stay502.
+  Configuration/busy/unavailable worker failures stay503. Timeouts explicitly
+  report that no new result/drawing was saved.
+- Existing POST `/api/v1/furniture/{furniture_id}/classification` and
+  POST `/api/v1/furniture/{furniture_id}/reconstruction` paths/payloads are
+  unchanged. This is an intentional status distinction, not a new endpoint.
+- `frontend/src/lib/photoAnalysisError.ts` retains reasons and distinguishes
+  input correction, incomplete prerequisites, unavailable services, and invalid
+  output. Plan-creation errors are kept separate from photo-analysis errors.
+- Manual type selection is labeled as testing/correction, not an AI result;
+  choosing a type does not fix an unavailable photo reconstruction service.
+- Fresh regression: **377 backend passed**, no new warnings; **65 frontend
+  passed**, 11 files; production build passed with existing ~852.86kB lazy viewer
+  warning. Worker42 is the unchanged preceding result, not rerun here.
+- Failure cases verify saved classification/type, reconstruction/source parts,
+  and plan contents are unchanged. Backend tests use a disposable PostgreSQL
+  sibling database; no live demo inference was deliberately failed.
+
+Only the verified API on8011 was reloaded. Worker/frontend remained active;
+readiness passed. Read-only API checks preserve the nine-part bookshelf draft,
+six-part finalized bookshelf, nine-part finalized table, fourteen- and
+eighteen-part finalized chairs, and sample quotation. The new bookshelf draft
+still requires user review before finalization/3D. No new geometry, training,
+dependency, database migration, pricing rule or automatic finalization was added.
+
 ## Subsequent bookshelf checkpoint
 
 Worker-only follow-on corrects the solid-backed bookshelf failure: internal

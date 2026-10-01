@@ -9,7 +9,9 @@ from app.core.enums import FurnitureImageView, FurnitureType
 from app.services.dimensions import CanonicalDimensions
 from app.services.http_reconstruction import HttpFurnitureReconstructor
 from app.services.photo_reconstruction import (
+    InvalidReconstructionOutputError,
     ReconstructionImage,
+    ReconstructionInputRejectedError,
     ReconstructionProviderUnavailableError,
 )
 
@@ -121,3 +123,47 @@ def test_worker_failure_preserves_safe_detail() -> None:
         match="SAM 2 checkpoint could not load",
     ):
         adapter.reconstruct(inputs(), FurnitureType.CHAIR, dimensions())
+
+
+@pytest.mark.parametrize("status", [400, 422])
+def test_photo_rejection_preserves_reason_without_claiming_invalid_geometry(status):
+    adapter = HttpFurnitureReconstructor("http://worker", 30, transport=httpx.MockTransport(
+        lambda request: httpx.Response(status, json={"detail": "No reliable internal shelf boundaries were found"})
+    ))
+    with pytest.raises(ReconstructionInputRejectedError, match="internal shelf boundaries"):
+        adapter.reconstruct(inputs(), FurnitureType.BOOKSHELF, dimensions())
+
+
+@pytest.mark.parametrize("status", [401, 403, 404, 408, 429])
+def test_worker_configuration_or_busy_status_is_not_a_photo_rejection(status):
+    adapter = HttpFurnitureReconstructor("http://worker", 30, transport=httpx.MockTransport(
+        lambda request: httpx.Response(status, json={"detail": "Internal routing detail"})
+    ))
+    with pytest.raises(ReconstructionProviderUnavailableError, match="could not accept the request"):
+        adapter.reconstruct(inputs(), FurnitureType.CHAIR, dimensions())
+
+
+@pytest.mark.parametrize("payload", [{"detail": []}, {"detail": "  "}, {}])
+def test_malformed_rejection_is_an_invalid_worker_result(payload):
+    adapter = HttpFurnitureReconstructor("http://worker", 30, transport=httpx.MockTransport(
+        lambda request: httpx.Response(422, json=payload)
+    ))
+    with pytest.raises(InvalidReconstructionOutputError):
+        adapter.reconstruct(inputs(), FurnitureType.CHAIR, dimensions())
+
+
+def test_reconstruction_timeout_does_not_expose_transport_details():
+    def timeout(request):
+        raise httpx.ReadTimeout("private transport detail", request=request)
+    adapter = HttpFurnitureReconstructor("http://worker", 30, transport=httpx.MockTransport(timeout))
+    with pytest.raises(ReconstructionProviderUnavailableError, match="timed out; no new drawing was saved"):
+        adapter.reconstruct(inputs(), FurnitureType.CHAIR, dimensions())
+
+
+def test_worker_rejection_detail_is_bounded():
+    adapter = HttpFurnitureReconstructor("http://worker", 30, transport=httpx.MockTransport(
+        lambda request: httpx.Response(422, json={"detail": "x" * 1000})
+    ))
+    with pytest.raises(ReconstructionInputRejectedError) as caught:
+        adapter.reconstruct(inputs(), FurnitureType.CHAIR, dimensions())
+    assert len(str(caught.value)) == 300

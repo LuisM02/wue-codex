@@ -9,6 +9,7 @@ import pytest
 from app.core.enums import FurnitureImageView, FurnitureType
 from app.services.classification import (
     ClassificationImage,
+    ClassificationInputRejectedError,
     ClassifierUnavailableError,
     InvalidClassifierOutputError,
 )
@@ -62,7 +63,7 @@ def test_http_classifier_preserves_worker_rejection_reason() -> None:
         ),
     )
     with pytest.raises(
-        InvalidClassifierOutputError, match="wrong orientation"
+        ClassificationInputRejectedError, match="wrong orientation"
     ):
         classifier.classify(_images())
 
@@ -90,4 +91,30 @@ def test_http_classifier_preserves_worker_failure_reason() -> None:
     )
 
     with pytest.raises(ClassifierUnavailableError, match="checkpoint could not load"):
+        classifier.classify(_images())
+
+
+@pytest.mark.parametrize("status", [401, 403, 404, 408, 429])
+def test_worker_configuration_or_busy_status_is_not_a_photo_rejection(status):
+    classifier = HttpFurnitureClassifier("http://worker", 30, transport=httpx.MockTransport(
+        lambda request: httpx.Response(status, json={"detail": "Internal routing detail"})
+    ))
+    with pytest.raises(ClassifierUnavailableError, match="could not accept the request"):
+        classifier.classify(_images())
+
+
+@pytest.mark.parametrize("payload", [{"detail": []}, {"detail": "  "}, {}])
+def test_malformed_rejection_is_not_presented_as_photo_evidence(payload):
+    classifier = HttpFurnitureClassifier("http://worker", 30, transport=httpx.MockTransport(
+        lambda request: httpx.Response(422, json=payload)
+    ))
+    with pytest.raises(InvalidClassifierOutputError):
+        classifier.classify(_images())
+
+
+def test_recognition_timeout_has_an_explicit_retry_reason():
+    def timeout(request):
+        raise httpx.ReadTimeout("private transport detail", request=request)
+    classifier = HttpFurnitureClassifier("http://worker", 30, transport=httpx.MockTransport(timeout))
+    with pytest.raises(ClassifierUnavailableError, match="timed out; no new recognition result was saved"):
         classifier.classify(_images())

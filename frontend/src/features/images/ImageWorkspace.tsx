@@ -2,7 +2,8 @@ import { useRef, useState, type ChangeEvent } from "react";
 
 import { BusyLabel, Notice, SectionHeading } from "../../components/Feedback";
 import { formatFileSize, furnitureLabel } from "../../lib/format";
-import { ApiError, api } from "../../services/apiClient";
+import { api } from "../../services/apiClient";
+import { photoAnalysisError } from "../../lib/photoAnalysisError";
 import type {
   Furniture,
   FurnitureClassification,
@@ -92,11 +93,7 @@ export function ImageWorkspace({
       onClassification(detected);
       onFurniture({ ...furniture, furniture_type: detected.predicted_type });
     } catch (reason) {
-      if (reason instanceof ApiError && reason.status === 503) {
-        setError("Automated recognition is not connected yet. For this local test, use the clearly marked manual confirmation below; it will be removed once the vision provider is connected.");
-      } else {
-        setError((reason as Error).message);
-      }
+      setError(photoAnalysisError(reason));
     } finally {
       setClassifying(false);
     }
@@ -182,7 +179,7 @@ export function ImageWorkspace({
           <div>
             <p className="eyebrow">Testing fallback</p>
             <h3>Confirm the type manually</h3>
-            <p>The real vision provider is not connected yet. Use this only to continue testing the reconstruction workflow.</p>
+            <p>Use this only for testing or correcting an uncertain type. This is a manual selection, not an AI result, and it does not reconstruct the furniture.</p>
           </div>
           <label className="field">
             <span>Furniture type</span>

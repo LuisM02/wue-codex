@@ -6,6 +6,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
+import httpx
 from fastapi.testclient import TestClient
 
 from app.api.dependencies import get_furniture_classifier
@@ -16,8 +17,29 @@ from app.services.classification import (
     ClassificationPrediction,
 )
 from app.services.image_storage import LocalImageStorage
+from app.services.http_classification import HttpFurnitureClassifier
 
 pytestmark = pytest.mark.integration
+
+
+@pytest.mark.parametrize("worker_status,api_status", [(400, 422), (422, 422), (503, 503)])
+def test_failed_worker_recognition_preserves_saved_result_and_type(
+    db_client, image_bytes_factory, worker_status, api_status,
+):
+    furniture_id = create_furniture(db_client)
+    upload_views(db_client, furniture_id, image_bytes_factory)
+    configured_classifier()
+    previous = db_client.post(f"/api/v1/furniture/{furniture_id}/classification").json()
+    before_furniture = db_client.get(f"/api/v1/furniture/{furniture_id}").json()
+    adapter = HttpFurnitureClassifier("http://worker", 30, transport=httpx.MockTransport(
+        lambda request: httpx.Response(worker_status, json={"detail": "Check the labeled view"})
+    ))
+    app.dependency_overrides[get_furniture_classifier] = lambda: adapter
+    response = db_client.post(f"/api/v1/furniture/{furniture_id}/classification")
+    assert response.status_code == api_status
+    assert response.json()["detail"] == "Check the labeled view"
+    assert db_client.get(f"/api/v1/furniture/{furniture_id}/classification").json() == previous
+    assert db_client.get(f"/api/v1/furniture/{furniture_id}").json() == before_furniture
 
 
 class RecordingClassifier:

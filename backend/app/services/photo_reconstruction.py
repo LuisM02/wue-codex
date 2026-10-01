@@ -29,6 +29,10 @@ class ReconstructionPrerequisiteError(RuntimeError):
     """Raised when the exact five-view input set cannot be reconstructed."""
 
 
+class ReconstructionInputRejectedError(RuntimeError):
+    """Raised when the worker cannot use the supplied photo evidence."""
+
+
 class InvalidReconstructionOutputError(RuntimeError):
     """Raised when a provider response violates the WUE geometry contract."""
 

@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from app.core.enums import FurnitureType
 from app.services.classification import (
     ClassificationImage,
+    ClassificationInputRejectedError,
     ClassificationPrediction,
     ClassifierUnavailableError,
     InvalidClassifierOutputError,
@@ -83,6 +84,10 @@ class HttpFurnitureClassifier:
                     },
                     files=files,
                 )
+        except httpx.TimeoutException as exc:
+            raise ClassifierUnavailableError(
+                "The local furniture recognition request timed out; no new recognition result was saved"
+            ) from exc
         except httpx.RequestError as exc:
             raise ClassifierUnavailableError(
                 "The local furniture recognition service is unavailable"
@@ -95,10 +100,17 @@ class HttpFurnitureClassifier:
                     "complete the analysis"
                 )
             )
+        if response.status_code in {400, 422} and _worker_error_detail(response):
+            raise ClassificationInputRejectedError(_worker_error_detail(response))
+        if response.status_code in {401, 403, 404, 408, 429}:
+            raise ClassifierUnavailableError(
+                "The local furniture recognition service could not accept the request; "
+                "check the service configuration or try again later"
+            )
         if response.status_code >= 400:
             raise InvalidClassifierOutputError(
                 _worker_error_detail(response)
-                or "The local furniture recognition service rejected the image set"
+                or "The local furniture recognition service returned an invalid rejection response"
             )
         try:
             payload = WorkerClassificationResponse.model_validate(

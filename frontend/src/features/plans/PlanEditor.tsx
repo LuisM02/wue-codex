@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { BusyLabel, EmptyState, Notice, SectionHeading } from "../../components/Feedback";
 import { furnitureLabel } from "../../lib/format";
+import { photoAnalysisError } from "../../lib/photoAnalysisError";
 import { api } from "../../services/apiClient";
 import type { Furniture, FurnitureDimensions, FurnitureImage, FurnitureImageCalibrationPayload, FurniturePlan, FurnitureReconstruction, ImageView, PlanComponent, PlanComponentPayload } from "../../types/api";
 import { ReconstructionFeedback } from "./ReconstructionFeedback";
@@ -108,11 +109,13 @@ export function PlanEditor({ furniture, dimensions, plan, referenceImages, onIma
   async function generate() {
     setBusy("generate");
     setError(null);
+    let analyzingPhotos = true;
     try {
       setAnalysis(await api.reconstruction.run(furniture.id));
+      analyzingPhotos = false;
       onPlan(await api.plans.generate(furniture.id));
     } catch (reason) {
-      setError((reason as Error).message);
+      setError(analyzingPhotos ? photoAnalysisError(reason) : (reason as Error).message);
     } finally {
       setBusy(null);
     }
@@ -246,11 +249,13 @@ export function PlanEditor({ furniture, dimensions, plan, referenceImages, onIma
     if (!plan) return;
     setBusy("rebuild");
     setError(null);
+    let analyzingPhotos = true;
     try {
       setAnalysis(await api.reconstruction.run(furniture.id));
+      analyzingPhotos = false;
       onPlan(await api.plans.rebuildFromPhotos(plan.id));
     } catch (reason) {
-      setError((reason as Error).message);
+      setError(analyzingPhotos ? photoAnalysisError(reason) : (reason as Error).message);
     } finally {
       setBusy(null);
     }

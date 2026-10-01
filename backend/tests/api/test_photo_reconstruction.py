@@ -4,6 +4,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
+import httpx
 from fastapi.testclient import TestClient
 
 from app.api.dependencies import get_furniture_reconstructor
@@ -11,8 +12,35 @@ from app.core.enums import FurnitureImageView
 from app.main import app
 from app.schemas.photo_reconstruction import ReconstructionPartProposal
 from app.services.photo_reconstruction import ReconstructionPrediction
+from app.services.http_reconstruction import HttpFurnitureReconstructor
 
 pytestmark = pytest.mark.integration
+
+
+@pytest.mark.parametrize("worker_status,payload,api_status", [
+    (400, {"detail": "The top photo has the wrong orientation"}, 422),
+    (422, {"detail": "No reliable internal shelf boundaries were found"}, 422),
+    (503, {"detail": "SAM checkpoint unavailable"}, 503),
+    (200, {"parts": []}, 502),
+    (422, {"detail": [{"msg": "worker contract invalid"}]}, 502),
+])
+def test_failed_http_analysis_preserves_saved_analysis_and_drawing(
+    db_client, image_bytes_factory, worker_status, payload, api_status,
+):
+    furniture_id, _ = create_ready_furniture(db_client, image_bytes_factory)
+    app.dependency_overrides[get_furniture_reconstructor] = PhotoSensitiveReconstructor
+    before_analysis = db_client.post(f"/api/v1/furniture/{furniture_id}/reconstruction").json()
+    before_plan = db_client.post(f"/api/v1/furniture/{furniture_id}/plans").json()
+    adapter = HttpFurnitureReconstructor("http://worker", 30, transport=httpx.MockTransport(
+        lambda request: httpx.Response(worker_status, json=payload)
+    ))
+    app.dependency_overrides[get_furniture_reconstructor] = lambda: adapter
+    response = db_client.post(f"/api/v1/furniture/{furniture_id}/reconstruction")
+    assert response.status_code == api_status, response.text
+    if isinstance(payload.get("detail"), str):
+        assert response.json()["detail"] == payload["detail"]
+    assert db_client.get(f"/api/v1/furniture/{furniture_id}/reconstruction").json() == before_analysis
+    assert db_client.get(f"/api/v1/plans/{before_plan['id']}").json() == before_plan
 
 
 class PhotoSensitiveReconstructor:

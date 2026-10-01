@@ -53,6 +53,11 @@ def classify_furniture(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
         ) from exc
+    except classification_service.ClassificationInputRejectedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
     except classification_service.ClassifierUnavailableError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

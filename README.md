@@ -3,6 +3,15 @@
 Latest verified prototype checkpoint and remaining limits:
 [October 1, 2026 checkpoint](docs/PROTOTYPE_CHECKPOINT_2026-10-01.md).
 
+Latest failure-feedback follow-on: explicit worker photo rejections now return
+HTTP422 through the business API, distinct from unavailable services (503) and
+invalid worker responses (502). Recognition/reconstruction screens retain the
+specific reason with correction or service-readiness guidance. Manual type
+selection is explicitly not AI recognition and does not restore reconstruction.
+**377 backend tests and 65 frontend tests pass; production build passes.**
+Latest unchanged worker result remains42 passed, not rerun for this follow-on.
+Failed analysis tests verify saved recognition, analysis and geometry are retained.
+
 October 1 bookshelf follow-on: solid-backed bookshelves now use sustained
 internal grayscale edge pairs for shelf proposals instead of trying to infer
 all shelves from the foreground silhouette. The saved bookshelf photos now

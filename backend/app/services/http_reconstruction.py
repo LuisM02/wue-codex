@@ -12,6 +12,7 @@ from app.services.dimensions import CanonicalDimensions
 from app.services.photo_reconstruction import (
     InvalidReconstructionOutputError,
     ReconstructionImage,
+    ReconstructionInputRejectedError,
     ReconstructionPrediction,
     ReconstructionProviderUnavailableError,
 )
@@ -90,6 +91,10 @@ class HttpFurnitureReconstructor:
                     data=data,
                     files=files,
                 )
+        except httpx.TimeoutException as exc:
+            raise ReconstructionProviderUnavailableError(
+                "The local photo reconstruction request timed out; no new drawing was saved"
+            ) from exc
         except httpx.RequestError as exc:
             raise ReconstructionProviderUnavailableError(
                 "The local photo reconstruction service is unavailable"
@@ -102,10 +107,17 @@ class HttpFurnitureReconstructor:
                     "complete the analysis"
                 )
             )
+        if response.status_code in {400, 422} and _worker_error_detail(response):
+            raise ReconstructionInputRejectedError(_worker_error_detail(response))
+        if response.status_code in {401, 403, 404, 408, 429}:
+            raise ReconstructionProviderUnavailableError(
+                "The local photo reconstruction service could not accept the request; "
+                "check the service configuration or try again later"
+            )
         if response.status_code >= 400:
             raise InvalidReconstructionOutputError(
                 _worker_error_detail(response)
-                or "The local photo reconstruction service rejected the image set"
+                or "The local photo reconstruction service returned an invalid rejection response"
             )
         try:
             payload = WorkerResponse.model_validate(response.json())

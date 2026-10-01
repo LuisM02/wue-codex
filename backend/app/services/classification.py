@@ -26,6 +26,10 @@ class ClassificationPrerequisiteError(RuntimeError):
     """Raised when the five-view source set is incomplete or unavailable."""
 
 
+class ClassificationInputRejectedError(RuntimeError):
+    """Raised when the worker rejects the supplied photo set."""
+
+
 class InvalidClassifierOutputError(RuntimeError):
     """Raised when an adapter returns a result outside its contract."""
 
