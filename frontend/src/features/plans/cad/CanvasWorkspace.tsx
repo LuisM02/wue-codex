@@ -11,6 +11,7 @@ import {
   longestProfileEdgeIndex,
   moveComponent,
   moveProfilePoint,
+  nearestProfilePoint,
   projectComponent,
   projectionBounds,
   removeProfilePoint,
@@ -135,6 +136,7 @@ export function CanvasWorkspace({
   const interaction = useRef<Interaction | null>(null);
   const [guides, setGuides] = useState<AxisGuide[]>([]);
   const [selectedProfilePoint, setSelectedProfilePoint] = useState<number | null>(null);
+  const [outlineEditEnabled, setOutlineEditEnabled] = useState(false);
   const [calibrationOpen, setCalibrationOpen] = useState(false);
   const [calibrationDraft, setCalibrationDraft] = useState<CalibrationMargins | null>(null);
   const definition = VIEW_DEFINITIONS[view];
@@ -168,6 +170,9 @@ export function CanvasWorkspace({
   const selected = components.find((component) => component.id === selectedId) ?? null;
   const selectedProjection = selected ? projectComponent(selected, view) : null;
   const selectedPoseEditable = !selected || !hasComponentRotation(selected);
+  const canEditOutline = !locked && selectedPoseEditable && outlineView
+    && selected?.geometry_kind === "extruded_profile" && Boolean(selected.profile_points?.length);
+  const outlineEditing = outlineEditEnabled && canEditOutline;
   const visibleGridSpacing = GRID_SPACING_MM * Math.max(1, Math.ceil(20 / Math.max(GRID_SPACING_MM * scale, 1)));
   const gridPixels = visibleGridSpacing * scale;
   const storedCalibration = referenceImage ? calibrationPayload(calibrationMargins(referenceImage)) : null;
@@ -190,7 +195,8 @@ export function CanvasWorkspace({
 
   useEffect(() => {
     setSelectedProfilePoint(null);
-  }, [selectedId, view]);
+    setOutlineEditEnabled(false);
+  }, [selectedId, view, locked]);
 
   useEffect(() => {
     setCalibrationOpen(false);
@@ -209,6 +215,12 @@ export function CanvasWorkspace({
   function beginMove(event: ReactPointerEvent<SVGGElement>, component: PlanComponent) {
     event.stopPropagation();
     onSelect(component.id);
+    if (outlineEditing && component.id === selectedId && event.button === 0) {
+      const point = clientPoint(event);
+      setSelectedProfilePoint(nearestProfilePoint(component,
+        (point.x - originX) / scale, (originY - point.y) / scale, definition.horizontalSign));
+      return;
+    }
     setSelectedProfilePoint(null);
     if (locked || event.button !== 0) return;
     const point = clientPoint(event);
@@ -218,7 +230,7 @@ export function CanvasWorkspace({
 
   function beginResize(event: ReactPointerEvent<SVGRectElement>, component: PlanComponent, handle: ResizeHandle) {
     event.stopPropagation();
-    if (locked || hasComponentRotation(component) || event.button !== 0) return;
+    if (locked || outlineEditing || hasComponentRotation(component) || event.button !== 0) return;
     const point = clientPoint(event);
     interaction.current = { type: "resize", pointerId: event.pointerId, start: point, before: component, handle };
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -226,7 +238,7 @@ export function CanvasWorkspace({
 
   function beginProfilePoint(event: ReactPointerEvent<SVGCircleElement>, component: PlanComponent, pointIndex: number) {
     event.stopPropagation();
-    if (locked || hasComponentRotation(component) || event.button !== 0) return;
+    if (!outlineEditing || hasComponentRotation(component) || event.button !== 0) return;
     setSelectedProfilePoint(pointIndex);
     interaction.current = {
       type: "profile-point",
@@ -323,7 +335,7 @@ export function CanvasWorkspace({
   }
 
   function addOutlinePoint() {
-    if (locked || !selectedPoseEditable || !outlineView || !selected?.profile_points) return;
+    if (!outlineEditing || !selected?.profile_points) return;
     const edgeIndex = selectedProfilePoint ?? longestProfileEdgeIndex(selected.profile_points);
     const after = insertProfilePoint(selected, edgeIndex);
     if (sameGeometry(selected, after)) return;
@@ -333,12 +345,12 @@ export function CanvasWorkspace({
   }
 
   function removeOutlinePoint(pointIndex = selectedProfilePoint) {
-    if (locked || !selectedPoseEditable || !outlineView || !selected || pointIndex === null) return;
+    if (!outlineEditing || !selected || pointIndex === null) return;
     const after = removeProfilePoint(selected, pointIndex);
     if (sameGeometry(selected, after)) return;
     onPreview(after);
     onCommit(selected, after);
-    setSelectedProfilePoint(null);
+    setSelectedProfilePoint(Math.max(0, pointIndex - 1));
   }
 
   const ordered = [...components].sort((first, second) => {
@@ -510,7 +522,7 @@ export function CanvasWorkspace({
             return (
               <g className="cad-selection-overlay">
                 <rect x={left} y={top} width={Math.max(2, right - left)} height={Math.max(2, bottom - top)} className="cad-selection-box" />
-                {!locked && selectedPoseEditable && handles.map(([handle, x, y]) => (
+                {!locked && selectedPoseEditable && !outlineEditing && handles.map(([handle, x, y]) => (
                   <rect
                     key={handle}
                     x={x - 5}
@@ -522,12 +534,12 @@ export function CanvasWorkspace({
                     onPointerDown={(event) => beginResize(event, selected, handle)}
                   />
                 ))}
-                {!locked && selectedPoseEditable && outlineView && selected.profile_points?.map((point, pointIndex) => (
+                {outlineEditing && selected.profile_points?.map((point, pointIndex) => pointIndex === selectedProfilePoint && (
                   <circle
                     key={`profile-point-${pointIndex}`}
                     cx={toScreenHorizontal(definition.horizontalSign * (Number(selected.x) + Number(point.u)))}
                     cy={toScreenVertical(selectedProjection.vertical + Number(point.v))}
-                    r="6"
+                    r="10"
                     className={`cad-profile-handle${selectedProfilePoint === pointIndex ? " is-active" : ""}`}
                     pointerEvents="all"
                     aria-label={`Move outline point ${pointIndex + 1}`}
@@ -572,18 +584,31 @@ export function CanvasWorkspace({
           ? selectedPoseEditable ? "Read-only inspection" : "Read-only · projected bounds · local dimensions in Properties"
           : !selectedPoseEditable
             ? "Rotated part · drag to move · edit size/angles in Properties · shown dimensions are projected bounds"
-          : outlineView && selected?.profile_points
-            ? "Drag round points to reshape the traced outline · square handles resize the whole part"
+          : outlineEditing
+            ? "Click near an outline corner to select a point · drag the active dot to reshape it"
             : "Drag parts · drag corner handles to resize · Alt-drag or middle-drag to pan"}</span>
-        {outlineView && selectedPoseEditable && selected?.profile_points && !locked ? (
+        {canEditOutline && selected?.profile_points ? (
           <div className="cad-outline-actions" role="toolbar" aria-label="Traced outline points">
-            <span>{selected.profile_points.length} points</span>
-            <button type="button" onClick={addOutlinePoint} disabled={selected.profile_points.length >= 256}>＋ Add point</button>
-            <button type="button" onClick={() => removeOutlinePoint()} disabled={selectedProfilePoint === null || selected.profile_points.length <= 3}>− Remove selected</button>
+            <button type="button" aria-pressed={outlineEditing} onClick={() => {
+              if (interaction.current) return;
+              setOutlineEditEnabled(!outlineEditing);
+              setSelectedProfilePoint(outlineEditing ? null : 0);
+            }}>{outlineEditing ? "Done editing outline" : "Edit outline"}</button>
+            {outlineEditing && <>
+              <label>
+                <span>Point</span>
+                <select aria-label="Outline point" value={selectedProfilePoint ?? ""}
+                  onChange={(event) => setSelectedProfilePoint(Number(event.target.value))}>
+                  {selected.profile_points.map((_, index) => <option key={index} value={index}>{index + 1} of {selected.profile_points!.length}</option>)}
+                </select>
+              </label>
+              <button type="button" onClick={addOutlinePoint} disabled={selected.profile_points.length >= 256}>＋ Add point</button>
+              <button type="button" onClick={() => removeOutlinePoint()} disabled={selectedProfilePoint === null || selected.profile_points.length <= 3}>− Remove selected</button>
+            </>}
           </div>
         ) : <span>{definition.horizontalLabel} horizontal · {definition.verticalLabel} vertical</span>}
         <span>Grid {visibleGridSpacing} mm · {snapEnabled
-          ? outlineView && selectedPoseEditable && selected?.profile_points
+          ? outlineEditing
             ? `Outline snap ${OUTLINE_SNAP_MM} mm`
             : `Snap ${GRID_SPACING_MM} mm`
           : "Snap off"}</span>

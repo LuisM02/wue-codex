@@ -35,6 +35,8 @@ export function PartReviewGuide({ furnitureType, components, selectedId, referen
           <button type="button" aria-pressed={focusSelected} disabled={busy || !selected} onClick={onFocus}>Show only this part</button>
         </div>
       </div>
+      <details className="cad-review-guide__details">
+        <summary>Review help &amp; photo comparison</summary>
       {selected && (
         <>
           <p className="cad-review-guide__size">Current local size: {Number(selected.width).toFixed(1)} × {Number(selected.height).toFixed(1)} × {selected.depth !== null ? Number(selected.depth).toFixed(1) : "—"} mm (X × Y × Z). These are editable model values, not verified measurements.</p>
@@ -53,6 +55,7 @@ export function PartReviewGuide({ furnitureType, components, selectedId, referen
         </>
       )}
       <p className="cad-review-guide__footnote">Navigation and isolation do not record a review. {locked ? "This finalized geometry cannot be edited." : "Review all parts before using Confirm parts; confirmation does not finalize the drawing."} Photo alignment is not camera calibration.</p>
+      </details>
     </section>
   );
 }

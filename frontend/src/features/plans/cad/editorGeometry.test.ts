@@ -10,6 +10,7 @@ import {
   longestProfileEdgeIndex,
   moveComponent,
   moveProfilePoint,
+  nearestProfilePoint,
   nextShelfName,
   projectComponent,
   removeProfilePoint,
@@ -107,6 +108,21 @@ describe("orthographic CAD geometry", () => {
     const moved = moveProfilePoint(profile, 2, -20, 10, 2, null);
     expect(moved.profile_points?.[2]).toEqual({ u: "440", v: "35" });
     expect(moved.profile_points?.[1]).toEqual({ u: "450", v: "0" });
+    expect(moved.profile_points).toHaveLength(profile.profile_points.length);
+    expect(profile.profile_points[2]).toEqual({ u: "450", v: "40" });
+  });
+
+  it("selects the nearest saved outline point in Front and Back without altering it", () => {
+    const profile = { ...component, geometry_kind: "extruded_profile" as const,
+      profile_points: [{ u: "0", v: "0" }, { u: "450", v: "0" },
+        { u: "450", v: "40" }, { u: "0", v: "40" }] };
+    const before = JSON.stringify(profile);
+    expect(nearestProfilePoint(profile, 474, 469)).toBe(2);
+    expect(nearestProfilePoint(profile, -474, 469, -1)).toBe(2);
+    expect(JSON.stringify(profile)).toBe(before);
+    expect(nearestProfilePoint(component, 25, 430)).toBeNull();
+    expect(nearestProfilePoint({ ...profile, rotation_x: "10" }, 474, 469)).toBeNull();
+    expect(nearestProfilePoint(profile, NaN, 469)).toBeNull();
   });
 
   it("clamps and snaps traced points inside their component bounds", () => {

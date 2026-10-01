@@ -343,6 +343,26 @@ export function resizeComponent(
   return next;
 }
 
+/** Pick a saved vertex for display only; never simplify or add geometry. */
+export function nearestProfilePoint(
+  component: PlanComponent,
+  horizontal: number,
+  vertical: number,
+  horizontalSign: 1 | -1 = 1,
+): number | null {
+  if (hasComponentRotation(component) || component.geometry_kind !== "extruded_profile"
+    || !component.profile_points?.length || !Number.isFinite(horizontal) || !Number.isFinite(vertical)) return null;
+  const u = horizontalSign * horizontal - numeric(component.x);
+  const v = vertical - numeric(component.y);
+  let closest = 0;
+  let distance = Infinity;
+  component.profile_points.forEach((point, index) => {
+    const candidate = (numeric(point.u) - u) ** 2 + (numeric(point.v) - v) ** 2;
+    if (candidate < distance) { distance = candidate; closest = index; }
+  });
+  return closest;
+}
+
 export function moveProfilePoint(
   component: PlanComponent,
   pointIndex: number,

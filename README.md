@@ -1,6 +1,21 @@
 # WUE Furniture Workshop
 
-Latest editor-view revision (October 2, 2026): the CAD toolbar and part-photo
+Latest editor-cleanup revision (October 2, 2026): part-by-part navigation stays
+visible, while detailed review instructions, sizes and photo-comparison buttons
+are collapsed under **Review help & photo comparison**. The required review and
+finalization gates remain unchanged. Traced vertices are hidden in normal move/
+resize mode. **Edit outline** shows one larger active vertex at a time; click
+near an outline corner or choose its point number, then drag the active dot.
+Point insertion/removal is explicit and available only in outline-edit mode.
+Changing the selected part, view or locked state exits that mode. No automatic
+vertex reduction or changes to saved geometry, calibration, estimates or quotes
+were made. **115 frontend tests pass in 14 files; production build passes.**
+Backend/worker code is unchanged and their suites were not rerun. The existing
+large viewer-chunk warning remains. Live checks exercised mode entry/exit,
+Front/Back point selection and the collapsed help section without geometry
+writes; protected saved designs and quotations were verified unchanged.
+
+Preceding editor-view revision (October 2, 2026): the CAD toolbar and part-photo
 comparison controls now expose **Front, Back, Left, Right, and Top** separately.
 Each named view uses its matching photograph. Back and Left reverse the display
 direction while movement, resizing and outline edits retain canonical X/Y/Z
