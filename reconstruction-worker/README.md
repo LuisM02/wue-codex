@@ -1,5 +1,28 @@
 # WUE local vision worker
 
+## October 1 backed-bookshelf correction
+
+Solid-backed bookshelves cannot reveal shelf locations through foreground
+occupancy alone. High-fill front views now use sustained, same-sign internal
+grayscale boundaries and thin opposite-edge pairs, with shadow-pair suppression.
+Persistent central-row frame bounds and side contrast edges set the carcass
+width; shelves and the bottom panel span that interior rather than tracing a
+narrow foot remnant. Evidence is still heuristic: shelf proposals require user
+review, depth/back/terminal thickness remain provisional, and horizontal trim or
+decorative bands can still be mistaken for a shelf. Occluded, low-contrast,
+sloped or crowded shelves may be rejected rather than reliably recognized.
+
+The old guessed middle shelf is removed. Missing shelf evidence returns an
+explicit HTTP422; it must not silently become a generic substitute. The actual
+saved test photos now propose four interior shelves/nine parts without changing
+the saved finalized plan. A separate local unreviewed comparison draft uses the
+same entered 450×900×500 mm scale, not verified physical measurements.
+
+`tests/test_bookshelf_geometry.py` adds twelve controlled geometry/HTTP cases.
+The worker suite is now **42 passing**, with the two existing Starlette/AnyIO
+deprecation warnings. These are functional regressions, not accuracy benchmarks.
+No dependency, training, endpoint or schema change is required.
+
 This process is deliberately separate from the business API. It receives exactly five verified views, rejects duplicate or incoherent inputs, and returns photo-derived editable geometry.
 
 The default pipeline is a lightweight baseline that runs immediately on Windows without downloading a model checkpoint. It traces the actual silhouettes, checks opposite-view consistency and expected orientation, identifies structural regions, and scales them to the user's measurements. It is most reliable when one furniture item is photographed against a plain contrasting background.

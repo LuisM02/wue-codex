@@ -1,5 +1,40 @@
 # WUE prototype checkpoint — October 1, 2026
 
+## Subsequent bookshelf checkpoint
+
+Worker-only follow-on corrects the solid-backed bookshelf failure: internal
+contrast edges now propose the four photographed shelves (nine parts total)
+instead of the earlier guessed single shelf. Stable frame bounds and full
+interior width replace the erroneous narrow bottom-panel trace. Missing shelf
+evidence returns HTTP422 instead of inserting a guessed middle shelf. Existing
+open-shelf regression remains passing. No new neural model/training is involved.
+
+Fresh worker result: **42 passed**, two existing deprecation warnings. Previous
+backend348/frontend57/build-pass results below remain the latest full checkpoint;
+those unchanged modules were not rerun for this scoped follow-on. The actual
+SAM-backed five-photo probe reports `saved_plans_unchanged = true` and
+`accuracy_verified = false`.
+
+Original bookshelf furniture `32fa721f-0cfd-4d4c-931d-a2d7f9970bef`, plan
+`8b8f8a25-d4e0-4099-9aad-b2dbb0ac7fab`, remains finalized with six parts.
+Separate comparison furniture `07d3bca1-c406-485f-abf2-dc597100a882`, name
+`Bookshelf internal-edge test (saved scale)`, in `Photo reconstruction tests`,
+has draft plan `d37157f2-0f29-483e-a436-43cc782ad203` with nine parts and
+`parts_reviewed_at = null`. It reuses the original entered 450×900×500 mm;
+the scale is not validated by physical measurement. No user review gate was bypassed.
+
+Shelf location/thickness follows front contrast edges, but side/back depth,
+back thickness, terminal thickness, joinery, perspective and floor shadows still
+require review. Decorative horizontal bands can resemble shelves. This is a
+bounded image-analysis improvement, not an exact reconstruction guarantee.
+The new draft is the next user review target; preserve all earlier demos.
+
+Latest API readback also shows chair plan `3fe6f55a-d667-4f94-95ea-f20c56193bc1`
+is now finalized with eighteen parts, reviewed at
+`2026-10-01T13:07:14.169833+08:00` during user testing. Earlier mentions of its
+unreviewed status below are historical. The agent did not finalize it. A fresh
+table probe still proposes nine parts and leaves its saved plans unchanged.
+
 This checkpoint saves the changes after `7db4ef8`. It is not a claim of
 measured reconstruction accuracy or production readiness.
 

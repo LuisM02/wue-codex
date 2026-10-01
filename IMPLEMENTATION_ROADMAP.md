@@ -1,5 +1,19 @@
 # WUE implementation roadmap
 
+October 1 bookshelf follow-on (latest): implemented a solid-back internal-edge
+path with bounded, coherent opposite-contrast shelf faces; stable frame bounds
+prevent a bottom leg fragment becoming a narrow bottom panel. Removed the guessed
+middle-shelf fallback. A SAM probe of the actual bookshelf photos now detects
+four interior shelves/nine parts and leaves the saved finalized plan unchanged.
+A separate nine-part draft in Photo reconstruction tests is unreviewed; the
+existing six-part bookshelf remains finalized. Worker42 tests pass, including
+HTTP explicit failure, altered shelf count/position/thickness, polarity, grain,
+short objects and one-pixel noise. Backend348/frontend57/build-pass remain the
+latest preceding full checkpoint results, not rerun for this worker-only change.
+No trained semantic recognition, cross-view depth fitting, accuracy benchmark,
+new dependency or API/database/frontend change was added. Next: user review of
+the new draft and physical thickness/scale evidence before finalization.
+
 Work proceeds in small, tested modules. Each module receives focused service tests, API tests where relevant, a full regression run, and a clean commit before the next module begins.
 
 Current status: Modules 1 through 17, the parametric CAD editor, Module 18A, Module 18B1, Modules 19A through 19C, and Modules 20 through 25 complete. Version 0.25.0 is the verified metric photo-calibration baseline.

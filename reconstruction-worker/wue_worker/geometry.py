@@ -991,10 +991,152 @@ def _dense_bands(values: list[float], threshold: float) -> list[tuple[int, int]]
     )
 
 
+def _coherent_photo_edges(
+    view: AnalyzedView, *, vertical: bool = False,
+) -> list[tuple[int, float]]:
+    """Long same-sign grayscale boundaries, not merely foreground occupancy."""
+    left, top, _, _ = view.bbox
+    along = view.object_width if vertical else view.object_height
+    across = view.object_height if vertical else view.object_width
+    start, stop = round(across * 0.15), round(across * 0.85)
+    edges: list[tuple[int, float]] = []
+    last_position = -10
+    for position in range(1, along):
+        changes = []
+        for cross in range(start, stop):
+            x, y = (position, cross) if vertical else (cross, position)
+            index = (top + y) * view.width + left + x
+            previous = index - (1 if vertical else view.width)
+            # Exclude edges belonging to background labels or empty openings.
+            if view.mask[index] and view.mask[previous]:
+                changes.append(view.grayscale[index] - view.grayscale[previous])
+        if len(changes) < (stop - start) * 0.8:
+            continue
+        contrast = median(changes)
+        if abs(contrast) < 16:
+            continue
+        direction = 1 if contrast > 0 else -1
+        if sum(change * direction >= 9 for change in changes) < len(changes) * 0.7:
+            continue
+        if edges and position - last_position <= 3 and contrast * edges[-1][1] > 0:
+            if abs(contrast) > abs(edges[-1][1]):
+                edges[-1] = (position, contrast)
+        else:
+            edges.append((position, contrast))
+        last_position = position
+    return edges
+
+
+def _bookshelf_edge_bands(
+    front: AnalyzedView, edges: list[tuple[int, float]],
+) -> list[tuple[int, int]]:
+    """Pair sustained opposite edges of thin shelf faces; suppress shadow pairs."""
+    maximum = max(3, round(front.object_height * 0.04))
+    candidates = [
+        (abs(first[1]) + abs(second[1]), first[0], second[0])
+        for first, second in zip(edges, edges[1:])
+        if first[1] * second[1] < 0
+        and 2 <= second[0] - first[0] <= maximum
+        and first[0] > front.object_height * 0.07
+        and second[0] < front.object_height * 0.93
+    ]
+    bands: list[tuple[int, int]] = []
+    for _, start, stop in sorted(candidates, reverse=True):
+        # One face can have several shadows/texture edges. Keep its strongest
+        # pair, not an extra shelf on each side of the same highlight.
+        if all(stop + maximum < other_start or start - maximum > other_stop
+               for other_start, other_stop in bands):
+            bands.append((start, stop))
+    return sorted(bands)
+
+
+def _backed_bookshelf(
+    front: AnalyzedView, width: float, height: float, depth: float,
+) -> tuple[list[PartProposal], list[str]]:
+    edges = _coherent_photo_edges(front)
+    shelves = _bookshelf_edge_bands(front, edges)
+    if not shelves:
+        raise ValueError(
+            "No reliable internal shelf boundaries were found in the backed "
+            "bookshelf photo. Use a clear, straight-on empty front view; "
+            "WUE will not insert a guessed middle shelf."
+        )
+    # Use persistent central-row bounds rather than a shadow-expanded bottom
+    # bounding box when locating the outer side faces.
+    left, top, _, _ = front.bbox
+    spans = []
+    for y in range(round(front.object_height * 0.2), round(front.object_height * 0.8)):
+        occupied = [x for x in range(front.object_width)
+                    if front.mask[(top + y) * front.width + left + x]]
+        if len(occupied) >= front.object_width * 0.6:
+            spans.append((occupied[0], occupied[-1] + 1))
+    if not spans:
+        raise ValueError("The bookshelf outer frame could not be separated reliably")
+    outer_left = round(median(span[0] for span in spans))
+    outer_right = round(median(span[1] for span in spans))
+    span_width = outer_right - outer_left
+    vertical = _coherent_photo_edges(front, vertical=True)
+    side_edges = []
+    for low, high in ((outer_left + 3, outer_left + span_width * 0.12),
+                      (outer_right - span_width * 0.12, outer_right - 3)):
+        candidates = [edge for edge in vertical if low <= edge[0] <= high]
+        if not candidates:
+            raise ValueError("The bookshelf side-panel boundaries need a clearer front view")
+        side_edges.append(max(candidates, key=lambda edge: abs(edge[1]))[0])
+    interior_left, interior_right = side_edges
+    face_height = round(median(stop - start for start, stop in shelves))
+    cap_edges = [edge for edge in edges if 3 <= edge[0] < front.object_height * 0.07]
+    top_stop = (max(cap_edges, key=lambda edge: abs(edge[1]))[0]
+                if cap_edges else face_height)
+    # A terminal shelf can blend into the floor/shadow; use its visible face
+    # onset if present and the observed shelf-face thickness as a provisional
+    # estimate. Never interpret a narrow leg remnant as the whole bottom panel.
+    polarity = next(contrast for position, contrast in edges if position == shelves[-1][0])
+    bottom_edges = [position for position, contrast in edges
+                    if contrast * polarity > 0
+                    and shelves[-1][1] + front.object_height * 0.05 < position
+                    < front.object_height * 0.95]
+    bottom_start = max(bottom_edges) if bottom_edges else front.object_height - face_height
+    bottom_stop = min(front.object_height, bottom_start + face_height)
+
+    def region(x_start: int, y_start: int, x_stop: int, y_stop: int) -> TracedRegion:
+        return _rectangle_region(
+            (x_stop - x_start) / span_width * width,
+            (y_stop - y_start) / front.object_height * height,
+            (x_start - outer_left) / span_width * width,
+            (front.object_height - y_stop) / front.object_height * height,
+        )
+
+    parts = [
+        _proposal("left_side", "panel", region(outer_left, 0, interior_left, front.object_height),
+                  depth, 0, 0, 0.5, ["front"]),
+        _proposal("right_side", "panel", region(interior_right, 0, outer_right, front.object_height),
+                  depth, 0, 1, 0.5, ["front"]),
+        _proposal("top_panel", "panel", region(interior_left, 0, interior_right, top_stop),
+                  depth, 0, 2, 0.48, ["front"]),
+        _proposal("bottom_panel", "panel", region(interior_left, bottom_start, interior_right, bottom_stop),
+                  depth, 0, 3, 0.4, ["front"]),
+        _proposal("back_panel", "panel", region(interior_left, top_stop, interior_right, bottom_start),
+                  max(depth * 0.035, 1), depth * 0.965, 4, 0.35, ["front"]),
+    ]
+    for number, (start, stop) in enumerate(shelves, start=1):
+        parts.append(_proposal(
+            f"shelf_{number}", "panel", region(interior_left, start, interior_right, stop),
+            depth * 0.94, 0, 4 + number, 0.5, ["front"],
+        ))
+    return parts, [
+        "Shelf faces were proposed from long internal contrast edges, not the outer silhouette; review each boundary",
+        "Bookshelf panel depth, back thickness, hidden joints and terminal panel thickness remain provisional; side/back views have not independently fitted them",
+        "Perspective and floor shadows can distort the frame scale; confirm dimensions before finalizing",
+    ]
+
+
 def _bookshelf(
     views: dict[str, AnalyzedView], width: float, height: float, depth: float
 ) -> tuple[list[PartProposal], list[str]]:
     front = views["front"]
+    if front.fill_ratio > 0.75:
+        return _backed_bookshelf(front, width, height, depth)
     columns = front.columns()
     rows = front.rows()
     vertical = _dense_bands(columns, 0.72)
@@ -1085,9 +1227,10 @@ def _bookshelf(
         if band[0] > interior_y_start and band[1] < interior_y_stop
     ]
     if not shelves:
-        center = round((interior_y_start + interior_y_stop) / 2)
-        thickness = max(2, round(front.object_height * 0.025))
-        shelves = [(center, min(interior_y_stop, center + thickness))]
+        raise ValueError(
+            "No reliable shelf bands were found. WUE will not insert a guessed middle shelf; "
+            "use an unobstructed front photo with visible shelf boundaries."
+        )
     for number, span in enumerate(shelves, start=1):
         region = trace_region(
             front,

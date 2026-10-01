@@ -3,6 +3,15 @@
 Latest verified prototype checkpoint and remaining limits:
 [October 1, 2026 checkpoint](docs/PROTOTYPE_CHECKPOINT_2026-10-01.md).
 
+October 1 bookshelf follow-on: solid-backed bookshelves now use sustained
+internal grayscale edge pairs for shelf proposals instead of trying to infer
+all shelves from the foreground silhouette. The saved bookshelf photos now
+propose four shelves and nine parts; the previous six-part finalized test is
+preserved. No guessed middle shelf is inserted when evidence is absent.
+**42 worker tests pass**; panel depths, back/terminal thickness and physical
+accuracy remain provisional. This is heuristic image analysis after segmentation,
+not newly trained neural shelf recognition.
+
 WUE (Wood U Estimate) is an AI-assisted system for reconstructing wooden furniture, estimating materials and labor, and producing quotations. This repository is a new, independent implementation and supports exactly three furniture types: `chair`, `dining_table`, and `bookshelf`.
 
 Modules 1 through 17 plus the photo-reconstruction contract, runnable local vision baseline, parametric CAD-like 2D editor, and BOM-first costing workflow establish the backend foundation, persisted domain resources, photo-first five-view workflow, replaceable AI boundaries, canonical overall dimensions, photo-derived part proposals, orthographic component editing, validated immutable design revisions, renderer-ready 3D geometry, separate administrative material and labor-rate catalogs, calculation-only cost domains, immutable quotation snapshots, and the guided web interface. The API includes typed environment configuration, a synchronous SQLAlchemy 2.x/PostgreSQL session layer, Alembic migrations, project/furniture CRUD, validated image storage, reconstruction provenance, deterministic calculations, and health endpoints.
