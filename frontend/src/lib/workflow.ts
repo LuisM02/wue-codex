@@ -1,6 +1,7 @@
 import type {
   BomSelection,
   Furniture,
+  FurnitureClassification,
   FurnitureDimensions,
   FurnitureImage,
   FurniturePlan,
@@ -12,6 +13,7 @@ export type WorkflowStepId = "project" | "photos" | "dimensions" | "plan" | "mod
 export interface WorkflowContext {
   project: Project | null;
   furniture: Furniture | null;
+  classification: FurnitureClassification | null;
   images: FurnitureImage[];
   dimensions: FurnitureDimensions | null;
   plan: FurniturePlan | null;
@@ -28,10 +30,18 @@ export const workflowSteps: Array<{ id: WorkflowStepId; number: string; label: s
   { id: "estimate", number: "07", label: "Quote", hint: "Price the build" },
 ];
 
+export function hasRecognizedPhotos(context: Pick<WorkflowContext, "images" | "furniture" | "classification">): boolean {
+  const views = new Set(context.images.map((image) => image.view));
+  return ["front", "back", "left", "right", "top"].every((view) => views.has(view as FurnitureImage["view"]))
+    && context.images.length === 5 && Boolean(context.classification)
+    && context.classification?.furniture_id === context.furniture?.id
+    && context.classification?.predicted_type === context.furniture?.furniture_type;
+}
+
 export function completedSteps(context: WorkflowContext): Set<WorkflowStepId> {
   const completed = new Set<WorkflowStepId>();
   if (context.project && context.furniture) completed.add("project");
-  if (context.images.length === 5 && context.furniture?.furniture_type) completed.add("photos");
+  if (hasRecognizedPhotos(context)) completed.add("photos");
   if (context.dimensions) completed.add("dimensions");
   if (context.plan?.status === "finalized") {
     completed.add("plan");
@@ -45,8 +55,10 @@ export function canOpenStep(step: WorkflowStepId, context: WorkflowContext): boo
   if (step === "project") return true;
   if (!context.project || !context.furniture) return false;
   if (step === "photos") return true;
-  if (step === "dimensions") return context.images.length === 5 && Boolean(context.furniture.furniture_type);
-  if (step === "plan") return Boolean(context.dimensions);
+  if (step === "dimensions") return hasRecognizedPhotos(context);
+  // Preserve inspection of historical saved designs; new analysis still has
+  // a server-side current-recognition gate. Do not erase a finalized demo.
+  if (step === "plan") return Boolean(context.plan) || Boolean(context.dimensions && hasRecognizedPhotos(context));
   if (step === "model" || step === "bom") return context.plan?.status === "finalized";
   return context.plan?.status === "finalized" && Boolean(context.bomSelection);
 }

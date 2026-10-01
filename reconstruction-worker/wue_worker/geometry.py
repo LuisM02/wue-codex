@@ -1368,7 +1368,69 @@ def reconstruct(
     )
 
 
+def _structure_candidates(views: dict[str, AnalyzedView]) -> set[str]:
+    """Conservative support gate, not open-world semantic object recognition.
+
+    Require an observed support/opening pattern rather than choosing a type
+    merely because it scored highest. Clear furniture-like impostors can still
+    pass; unfamiliar or occluded supported furniture can be rejected.
+    """
+    def legged(view: AnalyzedView) -> bool:
+        spans = _spans(view.columns(round(view.object_height * .74), round(view.object_height * .94)),
+                       .45, gap=1, minimum=max(2, view.object_width // 100))
+        # Perspective can expose three/four legs, not just two front legs.
+        return (2 <= len(spans) <= 4
+                and max(second[0] - first[1] for first, second in zip(spans, spans[1:])) >= view.object_width * .2
+                and sum(stop - start for start, stop in spans) <= view.object_width * .65)
+
+    def broad_bands(view: AnalyzedView) -> list[tuple[int, int]]:
+        return _dense_bands(view.rows(), .65)
+
+    def chair_elevation(view: AnalyzedView, side: bool) -> bool:
+        bands = broad_bands(view)
+        height = view.object_height
+        seat = (any(.28 * height <= (start + stop) / 2 <= .72 * height
+                    and stop - start <= height * .28 for start, stop in bands) if side
+                else max(view.rows()[round(height * .3):round(height * .7)]) >= .65)
+        upper = view.rows()[round(height * .10):round(height * .28)]
+        occupancy = sum(upper) / max(1, len(upper))
+        return (legged(view) and seat and len(bands) <= 2
+                and (.04 <= occupancy <= .5 if side else occupancy >= .12))
+
+    def table_elevation(view: AnalyzedView) -> bool:
+        height = view.object_height
+        bands = broad_bands(view)
+        return (legged(view) and len(bands) == 1
+                and bands[0][0] < height * .08 and bands[0][1] <= height * .45)
+
+    def framed(view: AnalyzedView) -> bool:
+        columns = view.columns(round(view.object_height * .12), round(view.object_height * .88))
+        edge = max(2, round(len(columns) * .18))
+        return max(columns[:edge]) >= .7 and max(columns[-edge:]) >= .7
+
+    candidates = set()
+    if all(chair_elevation(views[name], name in {"left", "right"})
+           for name in ("front", "back", "left", "right")):
+        candidates.add("chair")
+    if all(table_elevation(views[name]) for name in ("front", "back", "left", "right")):
+        candidates.add("dining_table")
+    front = views["front"]
+    bands = broad_bands(front)
+    open_shelves = (len(bands) >= 3 and any(.08 * front.object_height < start
+                    and stop < .92 * front.object_height for start, stop in bands))
+    backed_shelves = bool(_bookshelf_edge_bands(front, _coherent_photo_edges(front)))
+    if (open_shelves or backed_shelves) and all(framed(views[name]) for name in ("front", "left", "right")):
+        candidates.add("bookshelf")
+    return candidates
+
+
 def classify(views: dict[str, AnalyzedView]) -> tuple[str, float]:
+    candidates = _structure_candidates(views)
+    if len(candidates) != 1:
+        raise ValueError(
+            "Unsupported or uncertain furniture: WUE could not establish a clear chair, dining table, or bookshelf structure. "
+            "Upload five clear views of one supported furniture piece with its seat/backrest, tabletop/legs, or shelves visible."
+        )
     front = views["front"]
     rows = front.rows()
     columns = front.columns()
@@ -1402,7 +1464,10 @@ def classify(views: dict[str, AnalyzedView]) -> tuple[str, float]:
         + 0.25 * (1 / max(aspect, 0.35)),
     }
     ordered = sorted(scores.items(), key=lambda item: item[1], reverse=True)
-    best, best_score = ordered[0]
-    margin = best_score - ordered[1][1]
+    best = next(iter(candidates))
+    # Legacy silhouette scores remain a heuristic display score, not the
+    # acceptance gate and not a calibrated probability. Structural evidence
+    # can disambiguate, for example, a table with a deep apron from a chair.
+    margin = scores[best] - max(score for name, score in ordered if name != best)
     confidence = min(0.84, max(0.46, 0.54 + margin * 0.18))
     return best, round(confidence, 3)

@@ -13,7 +13,7 @@ export function photoAnalysisError(reason: unknown): string {
     return `${detail} Complete the required photos, recognition, or measurements before retrying.`;
   }
   if (reason.status === 503 || reason.status === 504) {
-    return `${detail} Check WUE's local AI service and retry when it is ready. Manually selecting a furniture type does not restore photo reconstruction.`;
+    return `${detail} Check WUE's local AI service and retry when it is ready. Recognition must succeed before new photo reconstruction.`;
   }
   if (reason.status === 502) {
     return `${detail} The AI service returned an unusable result; retry or report this message. Existing saved drawings have not been replaced by this failure.`;

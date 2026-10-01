@@ -182,6 +182,73 @@ def _files_for(factory) -> tuple[dict, list[dict[str, str]]]:
     return files, manifest
 
 
+def _unsupported_image(view, shape):
+    image = Image.new("RGB", (240, 260), "#f7f5ef")
+    draw = ImageDraw.Draw(image)
+    if shape == "disc":
+        draw.ellipse((40, 40, 200, 220), fill="#68412b")
+    elif shape == "box":
+        draw.rectangle((40, 25, 200, 230), fill="#68412b")
+    elif shape == "vase":
+        draw.polygon([(95, 25), (145, 25), (140, 70), (190, 160), (165, 230),
+                      (75, 230), (50, 160), (100, 70)], fill="#68412b")
+    else:
+        raise AssertionError(shape)
+    marker = VIEWS.index(view) * 3
+    draw.rectangle((8 + marker, 8, 9 + marker, 9), fill="#d8d5cd")
+    output = BytesIO()
+    image.save(output, "PNG")
+    return output.getvalue()
+
+
+@pytest.mark.parametrize("shape", ["disc", "box", "vase"])
+def test_clear_unrelated_shapes_are_rejected_not_forced_into_supported_types(client, shape):
+    files, manifest = _files_for(lambda view: _unsupported_image(view, shape))
+    response = client.post("/v1/classify", files=files, data={"image_manifest": json.dumps(manifest)})
+    assert response.status_code == 422, response.text
+    assert "Unsupported or uncertain furniture" in response.json()["detail"]
+    # A caller cannot evade the same evidence gate by supplying a type.
+    response = client.post("/v1/reconstruct", files=files, data={
+        "furniture_type": "bookshelf", "width_mm": "600", "height_mm": "1200",
+        "depth_mm": "600", "image_manifest": json.dumps(manifest),
+    })
+    assert response.status_code == 422, response.text
+    assert "Unsupported or uncertain furniture" in response.json()["detail"]
+
+
+def test_incompatible_front_and_side_structure_is_rejected(client):
+    files, manifest = _files_for(lambda view: _chair_image(view) if view in {"front", "back", "top"} else _table_image(view))
+    response = client.post("/v1/classify", files=files, data={"image_manifest": json.dumps(manifest)})
+    assert response.status_code == 422, response.text
+
+
+def test_supported_structure_cannot_be_reconstructed_as_a_different_type(client):
+    files, manifest = _files_for(_table_image)
+    response = client.post("/v1/reconstruct", files=files, data={
+        "furniture_type": "bookshelf", "width_mm": "1800", "height_mm": "750",
+        "depth_mm": "900", "image_manifest": json.dumps(manifest),
+    })
+    assert response.status_code == 422, response.text
+    assert "does not match" in response.json()["detail"]
+
+
+def test_perspective_visible_extra_legs_do_not_reject_a_supported_chair(client):
+    def photos(view):
+        with Image.open(BytesIO(_chair_image(view))) as image:
+            if view in {"front", "back"}:
+                draw = ImageDraw.Draw(image)
+                draw.rectangle((91, 124, 97, 205), fill="#68412b")
+                draw.rectangle((143, 124, 149, 205), fill="#68412b")
+            output = BytesIO()
+            image.save(output, "PNG")
+            return output.getvalue()
+    files, manifest = _files_for(photos)
+    response = client.post("/v1/classify", files=files, data={"image_manifest": json.dumps(manifest)})
+    assert response.status_code == 200, response.text
+    assert response.json()["furniture_type"] == "chair"
+    assert response.json()["classifier_version"].endswith("+structure-gate-v1")
+
+
 def test_health_and_model_status_are_honest(client: TestClient) -> None:
     assert client.get("/health").json()["version"] == "0.3.0"
     status = client.get("/v1/model-status").json()

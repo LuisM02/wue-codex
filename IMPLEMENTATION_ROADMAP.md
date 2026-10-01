@@ -1,6 +1,27 @@
 # WUE implementation roadmap
 
-October 1 chair pose follow-on (newest): stable mirrored-left and right side
+October 1 supported-structure recognition gate (newest): unsupported/uncertain
+photo sets are rejected422 before any label is returned. Chair/table support
+patterns must agree across all four elevations; shelf/frame evidence is required
+for bookshelves. Perspective-visible two to four legs are supported. Ambiguous
+patterns are not resolved by forcing the highest shape score. Recognition
+provenance adds `+structure-gate-v1` to `classifier_version`; score remains an
+uncalibrated heuristic, not accuracy. No new model training/dependencies/schema.
+The manual-type selector is removed from the normal UI. Current accepted
+recognition is required before measurement/new planning; old saved plans remain
+inspectable. The backend requires classification type and five-photo signature
+to match before calling reconstruction; manual type alone fails409. Worker
+reconstruction independently reruns the structural gate and rejects a mismatched
+requested type422. Failed recognition/reconstruction preserve stored designs.
+Fresh backend381/frontend89/worker62 and production build pass. Actual retained
+chair/table/bookshelf SAM recognition probes succeed and verify saved state
+unchanged. A separate synthetic disc test is rejected in the browser, with no
+type, classification or generated plan; later workflow steps stay locked.
+Limitation: this is not a semantic open-world classifier. Furniture-like
+impostors can pass; unusual, cluttered or occluded valid furniture can fail.
+Evaluate real supported/unsupported photos before claiming rejection accuracy.
+
+October 1 chair pose follow-on (preceding): stable mirrored-left and right side
 silhouettes must agree on backrest centerline angle and placement before fitting
 straight posts/slats. Fits over18°, inconsistent angles, wide/split/unreliable
 envelopes and rotated assemblies outside overall bounds are rejected together;

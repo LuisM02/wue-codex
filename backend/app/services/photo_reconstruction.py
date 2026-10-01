@@ -17,6 +17,7 @@ from app.services import furniture_images as image_service
 from app.services._persistence import commit
 from app.services.image_storage import ImageStorage, ImageStorageNotFoundError
 from app.services.reconstruction_state import get_reconstruction
+from app.services.classification_state import get_classification
 
 REQUIRED_VIEWS = tuple(FurnitureImageView)
 
@@ -186,6 +187,13 @@ def reconstruct_furniture(
                 checksum_sha256=image.checksum_sha256,
                 data=data,
             )
+        )
+
+    classification = get_classification(session, furniture.id)
+    if (classification is None or classification.predicted_type != furniture.furniture_type
+            or classification.input_signature != build_input_signature(tuple(images))):
+        raise ReconstructionPrerequisiteError(
+            "Recognize the current five photos before reconstruction; a manually assigned type is not an accepted recognition result"
         )
 
     canonical = dimension_service.CanonicalDimensions(

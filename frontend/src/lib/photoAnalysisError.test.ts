@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ApiError } from "../services/apiClient";
 import { photoAnalysisError } from "./photoAnalysisError";
 import { ImageWorkspace } from "../features/images/ImageWorkspace";
-import type { Furniture, FurnitureImage } from "../types/api";
+import type { Furniture, FurnitureImage, FurnitureClassification } from "../types/api";
 
 describe("Photo analysis failures", () => {
   it("keeps the missing-shelf reason and does not blame service availability", () => {
@@ -20,7 +20,7 @@ describe("Photo analysis failures", () => {
     const result = photoAnalysisError(new ApiError("SAM checkpoint could not load", status));
     expect(result).toContain("SAM checkpoint could not load");
     expect(result).toContain("local AI service");
-    expect(result).toContain("does not restore photo reconstruction");
+    expect(result).toContain("Recognition must succeed");
     expect(result).not.toContain("not connected yet");
   });
 
@@ -41,7 +41,7 @@ describe("Photo analysis failures", () => {
     expect(photoAnalysisError(new TypeError("Failed to fetch"))).toContain("WUE is running and reachable");
   });
 
-  it("labels manual classification honestly without claiming the provider is disconnected", () => {
+  it("blocks unrecognized photos and does not offer a manual type bypass", () => {
     const markup = renderToStaticMarkup(createElement(ImageWorkspace, {
       furniture: { id: "test", name: "Bookshelf", furniture_type: null } as Furniture,
       images: ["front", "back", "left", "right", "top"].map((view) => ({
@@ -49,7 +49,35 @@ describe("Photo analysis failures", () => {
       })) as FurnitureImage[], classification: null,
       onImages() {}, onClassification() {}, onFurniture() {}, onContinue() {},
     }));
-    expect(markup).toContain("manual selection, not an AI result");
+    expect(markup).toContain("Unsupported or uncertain structure is blocked");
+    expect(markup).not.toContain("Confirm for testing");
+    expect(markup).not.toContain("<select");
+    expect(markup).toMatch(/<button[^>]*disabled=""[^>]*>Set dimensions/);
     expect(markup).not.toContain("provider is not connected yet");
+  });
+
+  it.each([false, true])("a manually stored type cannot unlock continuation: %s", (typed) => {
+    const markup = renderToStaticMarkup(createElement(ImageWorkspace, {
+      furniture: { id: "test", name: "Chair", furniture_type: typed ? "chair" : null } as Furniture,
+      images: ["front", "back", "left", "right", "top"].map((view) => ({
+        id: view, view, pixel_width: 100, pixel_height: 100, file_size_bytes: 100,
+      })) as FurnitureImage[], classification: null,
+      onImages() {}, onClassification() {}, onFurniture() {}, onContinue() {},
+    }));
+    expect(markup).toMatch(/<button[^>]*disabled=""[^>]*>Set dimensions/);
+  });
+
+  it("accepted recognition unlocks continuation but its score is not called accuracy", () => {
+    const markup = renderToStaticMarkup(createElement(ImageWorkspace, {
+      furniture: { id: "test", name: "Chair", furniture_type: "chair" } as Furniture,
+      images: ["front", "back", "left", "right", "top"].map((view) => ({
+        id: view, view, pixel_width: 100, pixel_height: 100, file_size_bytes: 100,
+      })) as FurnitureImage[],
+      classification: { furniture_id: "test", predicted_type: "chair", confidence: "0" } as FurnitureClassification,
+      onImages() {}, onClassification() {}, onFurniture() {}, onContinue() {},
+    }));
+    expect(markup).toContain("0% shape score · not accuracy");
+    expect(markup).not.toMatch(/<button[^>]*disabled=""[^>]*>Set dimensions/);
+    expect(markup).not.toContain("Recognition required");
   });
 });

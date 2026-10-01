@@ -14,7 +14,7 @@ from app.main import app
 from app.schemas.photo_reconstruction import ReconstructionPartProposal
 from app.services.photo_reconstruction import ReconstructionPrediction
 from app.services.http_reconstruction import HttpFurnitureReconstructor
-from tests.support.photo_reconstruction import TemplateTestReconstructor
+from tests.support.photo_reconstruction import TemplateTestReconstructor, recognize_test_photos
 
 pytestmark = pytest.mark.integration
 
@@ -155,7 +155,35 @@ def create_ready_furniture(
             files={"file": (f"{view.value}.png", data, "image/png")},
             data={"source": "upload"},
         ).status_code == 201
+    recognize_test_photos(client, furniture_id)
     return furniture_id, uploaded
+
+
+def test_manual_type_cannot_bypass_recognition(db_client, image_bytes_factory):
+    furniture_id, _ = create_ready_furniture(db_client, image_bytes_factory)
+    # A different manually assigned type invalidates the accepted recognition.
+    assert db_client.patch(f"/api/v1/furniture/{furniture_id}", json={"furniture_type": "bookshelf"}).status_code == 200
+    provider = PhotoSensitiveReconstructor()
+    app.dependency_overrides[get_furniture_reconstructor] = lambda: provider
+    response = db_client.post(f"/api/v1/furniture/{furniture_id}/reconstruction")
+    assert response.status_code == 409
+    assert "manually assigned type" in response.json()["detail"]
+    assert provider.calls == []
+
+
+def test_stale_recognition_signature_cannot_call_reconstructor(db_client, image_bytes_factory, db_session):
+    from app.services.classification_state import get_classification
+    from uuid import UUID
+    furniture_id, _ = create_ready_furniture(db_client, image_bytes_factory)
+    # Simulate corrupt/stale provenance without production image invalidation.
+    classification = get_classification(db_session, UUID(furniture_id))
+    classification.input_signature = "0" * 64
+    db_session.commit()
+    provider = PhotoSensitiveReconstructor()
+    app.dependency_overrides[get_furniture_reconstructor] = lambda: provider
+    response = db_client.post(f"/api/v1/furniture/{furniture_id}/reconstruction")
+    assert response.status_code == 409
+    assert provider.calls == []
 
 
 def test_default_provider_refuses_to_make_a_generic_substitute(

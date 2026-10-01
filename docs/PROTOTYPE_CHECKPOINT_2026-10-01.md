@@ -1,6 +1,71 @@
 # WUE prototype checkpoint — October 1, 2026
 
-## Latest two-side chair lean checkpoint
+## Latest unsupported/uncertain recognition gate checkpoint
+
+- IMPLEMENTED: `geometry.py::_structure_candidates` requires one supported
+  structural hypothesis instead of always selecting the largest score. Chair
+  seat/backrest/leg patterns and table top/leg patterns must appear across four
+  elevations; bookshelves need visible shelves/internal shelf edges and frame
+  evidence in the front and sides. Separated two to four lower support spans
+  accommodate perspective-visible rear legs. Zero/multiple hypotheses reject
+  with `Unsupported or uncertain furniture` (HTTP422). Confidence retains its
+  legacy heuristic formula for display only; it is not an acceptance threshold,
+  calibrated probability or measured reconstruction/classification accuracy.
+- IMPLEMENTED: `/v1/reconstruct` independently checks recognition and requires
+  the detected type to match the requested `furniture_type`; manual type cannot
+  force unsupported geometry. New classifier provenance uses the existing
+  `classifier_version` field plus `+structure-gate-v1`. No new API fields,
+  endpoints, migrations, dependencies or model training.
+- IMPLEMENTED: business reconstruction checks a saved classification's
+  `predicted_type` against `furniture.furniture_type`, and `input_signature`
+  against all five integrity-checked current photo inputs before invoking the
+  provider. Missing/stale/mismatched recognition returns409 without a provider
+  call. Existing manual CRUD type fields remain for compatibility, but do not
+  satisfy this gate. No live records or historical approval state are migrated.
+- IMPLEMENTED: normal Photos UI removes the manual selector/Confirm for testing.
+  `hasRecognizedPhotos` requires distinct five views, accepted classification
+  for this furniture and matching type. Measure and new planning are blocked
+  without it; existing saved plans/3D/BOM/quotes remain inspectable under their
+  old finalized/selection rules. A failed recognition clears only the current
+  screen's recognition state; stored historical results/designs are preserved.
+  The UI calls the recognition score a shape score, explicitly not accuracy.
+- Fresh tests: **backend381, frontend89 (12 files), worker62 passed**, frontend
+  production build passed. Existing852.86kB viewer-chunk warning and two worker
+  Starlette/AnyIO deprecations remain. Controlled negative discs, boxes and vases,
+  conflicting front/side structure, wrong reconstruction type, stale signature,
+  manual bypass and continued inspection of old plans are covered. Test-only
+  fake recognition was added explicitly to synthetic reconstruction fixtures;
+  no production bypass or lowered rejection threshold was introduced.
+- Live SAM checks: retained actual chair, dining table and bookshelf inputs
+  return their expected types, with each probe comparing saved furniture,
+  photos/calibration, classification and plans before/after unchanged. New
+  `scripts/probe-saved-recognition.py` never persists classifications. An initial
+  two-support-only rule falsely rejected the supplied chair's visible rear legs;
+  inspection established three/four spans, corrected by the perspective-leg rule
+  and a new regression. Final actual chair probe passes. This is small-case
+  verification, not a representative supported/unsupported accuracy benchmark.
+- Live browser negative test: separate furniture
+  `908ab525-9334-4347-a777-cad97f1ef505`, name
+  `Unsupported disc rejection check (synthetic test)` in Photo reconstruction
+  tests. Five synthetic marker-distinct disc images (not real furniture photos)
+  return422. Type remains null, no classification is saved and plans are empty.
+  Set dimensions and all later steps stay disabled; no manual bypass appears.
+  Browser left on this test's Photos screen. Local screenshot outside Git:
+  `C:\Users\Luis Mendoza\Documents\ChatGPT\wue codex edition\wue-unsupported-recognition-blocked.jpg`.
+- Only identity-verified WUE worker/API processes were reloaded; readiness
+  passes. No installations, migrations, resets, user approval/finalization or
+  unrelated process termination. Existing finalized demos and sample quote are
+  preserved; legacy classification records are historical, not retroactively
+  certified by the new gate.
+
+Limitation: this is conservative heuristic structure validation following SAM
+segmentation, not a trained semantic/open-world object classifier. Furniture-like
+impostors can still pass; unusual/occluded valid furniture may be rejected. No
+claim that every random object or all unsupported furniture will be blocked.
+Next: evaluate varied real supported/unsupported examples while continuing the
+defense rehearsal, user-led geometry review and separate local data backups.
+
+## Preceding two-side chair lean checkpoint
 
 - IMPLEMENTED: `reconstruction-worker/wue_worker/chair_pose.py` fits a straight
   backrest centerline only when mirrored Left and Right silhouettes agree.

@@ -93,11 +93,12 @@ export default function App() {
   const context = useMemo<WorkflowContext>(() => ({
     project,
     furniture,
+    classification,
     images,
     dimensions,
     plan,
     bomSelection,
-  }), [project, furniture, images, dimensions, plan, bomSelection]);
+  }), [project, furniture, classification, images, dimensions, plan, bomSelection]);
   const referenceImages = useMemo<ReferenceImages>(() => {
     if (!furniture) return {};
     return Object.fromEntries(

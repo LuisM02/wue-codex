@@ -3,7 +3,19 @@
 Latest verified prototype checkpoint and remaining limits:
 [October 1, 2026 checkpoint](docs/PROTOTYPE_CHECKPOINT_2026-10-01.md).
 
-Latest chair pose follow-on: agreeing mirrored-left/right silhouette centerlines
+Latest recognition safety follow-on: unsupported/uncertain structural evidence
+now returns422 instead of forcing the highest-scoring furniture label. Seat/
+backrest/leg, tabletop/leg and shelf/frame evidence is required across relevant
+views. The ordinary manual-type selector is removed; reconstruction requires
+a saved recognition matching the current five-photo signature and requested
+type, and the worker checks that type again. Existing saved designs remain
+inspectable. **Backend381, frontend89 and worker62 tests pass; build passes.**
+Actual saved chair/table/bookshelf photo probes pass without changing their
+stored state. This is a conservative heuristic support gate, not trained
+open-world recognition: furniture-like impostors can pass and unusual/occluded
+valid furniture can be rejected. The displayed shape score is not accuracy.
+
+Preceding chair pose follow-on: agreeing mirrored-left/right silhouette centerlines
 can now estimate a conservative straight lean for detected backrest posts/slats.
 Unstable, conflicting, excessive or out-of-bounds fits keep the original upright
 proposal with an explicit warning. The supplied slatted chair yields about8.5°

@@ -113,7 +113,7 @@ async def classify(
     return ClassificationResponse(
         furniture_type=furniture_type,
         classifier_name=segmentation.classifier_name,
-        classifier_version=segmentation.provider_version,
+        classifier_version=f"{segmentation.provider_version}+structure-gate-v1",
         confidence=confidence,
     )
 
@@ -149,6 +149,11 @@ async def reconstruct(
         warnings = validate_view_set(
             views, (width_mm, height_mm, depth_mm)
         )
+        detected_type, _ = classify_views(views)
+        if detected_type != furniture_type:
+            raise ImageSetRejected(
+                "The recognized furniture type does not match the requested reconstruction type. Recognize the current photos again."
+            )
         return reconstruct_views(
             furniture_type,
             views,

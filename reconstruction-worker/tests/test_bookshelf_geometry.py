@@ -161,4 +161,4 @@ def test_worker_http_reports_detected_shelves_or_explicit_failure(positions, exp
     if expected_status == 200:
         assert len(response.json()["parts"]) == 9
     else:
-        assert "will not insert a guessed middle shelf" in response.json()["detail"]
+        assert "Unsupported or uncertain furniture" in response.json()["detail"]

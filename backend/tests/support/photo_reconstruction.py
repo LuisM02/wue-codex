@@ -5,13 +5,14 @@ from io import BytesIO
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from app.api.dependencies import get_furniture_reconstructor
+from app.api.dependencies import get_furniture_reconstructor, get_furniture_classifier
 from app.core.enums import FurnitureImageView
 from app.main import app
 from app.models.furniture_reconstruction import FurnitureReconstruction
 from app.models.furniture_reconstruction_part import FurnitureReconstructionPart
 from app.schemas.photo_reconstruction import ReconstructionPartProposal
 from app.services.photo_reconstruction import ReconstructionPrediction
+from app.services.classification import ClassificationPrediction
 from app.services.plan_geometry import generate_default_components
 
 
@@ -51,6 +52,23 @@ class TemplateTestReconstructor:
         )
 
 
+def recognize_test_photos(client: TestClient, furniture_id: str) -> None:
+    """Explicit test recognition, never a production manual-type bypass."""
+    furniture_type = client.get(f"/api/v1/furniture/{furniture_id}").json()["furniture_type"]
+
+    class TestClassifier:
+        def classify(self, images):
+            from app.core.enums import FurnitureType
+            return ClassificationPrediction(
+                furniture_type=FurnitureType(furniture_type), classifier_name="explicit-test-classifier",
+                classifier_version="1", confidence="1",
+            )
+
+    app.dependency_overrides[get_furniture_classifier] = TestClassifier
+    response = client.post(f"/api/v1/furniture/{furniture_id}/classification")
+    assert response.status_code == 200, response.text
+
+
 def _png_bytes(color: tuple[int, int, int]) -> bytes:
     output = BytesIO()
     Image.new("RGB", (8, 6), color=color).save(output, format="PNG")
@@ -67,6 +85,7 @@ def prepare_test_reconstruction(client: TestClient, furniture_id: str) -> dict:
             data={"source": "upload"},
         )
         assert response.status_code == 201
+    recognize_test_photos(client, furniture_id)
     app.dependency_overrides[get_furniture_reconstructor] = TemplateTestReconstructor
     response = client.post(f"/api/v1/furniture/{furniture_id}/reconstruction")
     assert response.status_code == 200, response.text

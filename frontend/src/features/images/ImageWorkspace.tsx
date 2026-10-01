@@ -4,11 +4,11 @@ import { BusyLabel, Notice, SectionHeading } from "../../components/Feedback";
 import { formatFileSize, furnitureLabel } from "../../lib/format";
 import { api } from "../../services/apiClient";
 import { photoAnalysisError } from "../../lib/photoAnalysisError";
+import { hasRecognizedPhotos } from "../../lib/workflow";
 import type {
   Furniture,
   FurnitureClassification,
   FurnitureImage,
-  FurnitureType,
   ImageView,
 } from "../../types/api";
 
@@ -43,9 +43,9 @@ export function ImageWorkspace({
   const [pendingView, setPendingView] = useState<ImageView | null>(null);
   const [busyView, setBusyView] = useState<ImageView | null>(null);
   const [classifying, setClassifying] = useState(false);
-  const [manualType, setManualType] = useState<FurnitureType>("chair");
   const [error, setError] = useState<string | null>(null);
   const complete = images.length === views.length;
+  const recognized = hasRecognizedPhotos({ furniture, images, classification });
 
   function openPicker(view: ImageView) {
     setPendingView(view);
@@ -93,19 +93,8 @@ export function ImageWorkspace({
       onClassification(detected);
       onFurniture({ ...furniture, furniture_type: detected.predicted_type });
     } catch (reason) {
+      onClassification(null);
       setError(photoAnalysisError(reason));
-    } finally {
-      setClassifying(false);
-    }
-  }
-
-  async function confirmType() {
-    setClassifying(true);
-    setError(null);
-    try {
-      onFurniture(await api.furniture.update(furniture.id, { furniture_type: manualType }));
-    } catch (reason) {
-      setError((reason as Error).message);
     } finally {
       setClassifying(false);
     }
@@ -161,10 +150,8 @@ export function ImageWorkspace({
         <div className="classification-strip__icon" aria-hidden="true">◎</div>
         <div>
           <small>Furniture recognition</small>
-          {classification ? (
-            <strong>{furnitureLabel(classification.predicted_type)}{classification.confidence ? ` · ${Math.round(Number(classification.confidence) * 100)}% confidence` : ""}</strong>
-          ) : furniture.furniture_type ? (
-            <strong>{furnitureLabel(furniture.furniture_type)} · confirmed manually</strong>
+          {recognized && classification ? (
+            <strong>{furnitureLabel(classification.predicted_type)}{classification.confidence !== null ? ` · ${Math.round(Number(classification.confidence) * 100)}% shape score · not accuracy` : ""}</strong>
           ) : (
             <strong>{complete ? "Five views are ready to check" : "Available after all five photos"}</strong>
           )}
@@ -174,24 +161,13 @@ export function ImageWorkspace({
         </button>
       </div>
 
-      {complete && !classification && !furniture.furniture_type && (
-        <div className="manual-classification panel">
+      {complete && !recognized && (
+        <div className="panel" role="note" aria-label="Recognition required">
           <div>
-            <p className="eyebrow">Testing fallback</p>
-            <h3>Confirm the type manually</h3>
-            <p>Use this only for testing or correcting an uncertain type. This is a manual selection, not an AI result, and it does not reconstruct the furniture.</p>
+            <p className="eyebrow">Recognition required</p>
+            <h3>Only chairs, dining tables, and bookshelves can proceed</h3>
+            <p>Recognize the five photos first. Unsupported or uncertain structure is blocked; replace unclear photos and try again. Manually assigning a type cannot bypass recognition. This structural check can still make mistakes.</p>
           </div>
-          <label className="field">
-            <span>Furniture type</span>
-            <select value={manualType} onChange={(event) => setManualType(event.target.value as FurnitureType)}>
-              <option value="chair">Chair</option>
-              <option value="dining_table">Dining table</option>
-              <option value="bookshelf">Bookshelf</option>
-            </select>
-          </label>
-          <button className="button button--secondary" disabled={classifying} onClick={confirmType}>
-            {classifying ? <BusyLabel>Saving…</BusyLabel> : "Confirm for testing"}
-          </button>
         </div>
       )}
 
@@ -200,7 +176,7 @@ export function ImageWorkspace({
           <small>Selected piece</small>
           <strong>{furniture.name} · {furniture.furniture_type ? furnitureLabel(furniture.furniture_type) : "Awaiting recognition"}</strong>
         </div>
-        <button className="button button--primary" disabled={!complete || !furniture.furniture_type} onClick={onContinue}>Set dimensions <span>→</span></button>
+        <button className="button button--primary" disabled={!recognized || classifying || busyView !== null} onClick={onContinue}>Set dimensions <span>→</span></button>
       </div>
     </section>
   );
