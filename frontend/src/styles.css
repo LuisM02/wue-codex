@@ -352,6 +352,13 @@ h1, h2, h3, strong, .button { font-family: "Manrope", "DM Sans", sans-serif; }
 .component-schedule { margin-top: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
 .component-schedule summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 17px; cursor: pointer; list-style: none; }
 .component-schedule summary::-webkit-details-marker { display: none; }
+.analysis-feedback { margin: 18px 0; padding: 14px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper, #fffdf8); }
+.analysis-feedback__summary { display: grid; gap: 5px; font-size: 12px; }
+.analysis-feedback__summary span { color: var(--muted); font-size: 11px; }
+.analysis-feedback details { margin-top: 12px; font-size: 12px; }
+.analysis-feedback summary { cursor: pointer; color: var(--ink); }
+.analysis-feedback ul { margin: 10px 0 0; padding-left: 20px; color: var(--muted); line-height: 1.6; }
+.analysis-feedback .notice { margin: 12px 0 0; }
 .component-schedule summary > div { display: grid; }
 .component-schedule summary strong { font-size: 11px; }
 .component-schedule summary small { margin-top: 3px; color: var(--muted); font-size: 8px; }
@@ -414,6 +421,18 @@ h1, h2, h3, strong, .button { font-family: "Manrope", "DM Sans", sans-serif; }
 .cad-reference-controls select { max-width: 100px; }
 .cad-reference-controls button { padding: 0 7px; font-weight: 700; }
 .cad-reference-controls button[aria-pressed="true"] { border-color: #e3b76d; background: #654e32; color: white; }
+.cad-reference-controls button[aria-expanded="true"] { border-color: #9fc4ad; background: #335945; color: white; }
+.cad-calibration-panel { position: absolute; top: 36px; right: 0; width: 250px; padding: 11px; border: 1px solid #71837a; border-radius: 4px; background: rgb(244 247 245 / 98%); color: #26372e; box-shadow: 0 8px 24px rgb(0 0 0 / 28%); }
+.cad-calibration-panel > strong { display: block; font-size: 10px; }
+.cad-calibration-panel > p { margin: 4px 0 9px; color: #607067; font-size: 8px; line-height: 1.45; }
+.cad-calibration-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.cad-calibration-grid label { position: relative; display: grid; grid-template-columns: 1fr 17px; align-items: center; gap: 3px; }
+.cad-calibration-grid label > span { grid-column: 1 / -1; }
+.cad-calibration-grid input { width: 100%; height: 26px; padding: 0 5px; border: 1px solid #aebbb4; border-radius: 3px; background: white; color: #26372e; font: inherit; }
+.cad-calibration-grid i { color: #607067; font-size: 8px; font-style: normal; }
+.cad-calibration-panel > small { display: block; margin-top: 7px; color: #aa493c; font-size: 7px; }
+.cad-calibration-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; }
+.cad-calibration-actions button:last-child { background: #335945; color: white; }
 .cad-canvas-frame svg { width: 100%; height: 100%; min-height: 580px; display: block; touch-action: none; user-select: none; }
 .cad-canvas-background { fill: #252f2b; }
 .cad-grid-line { stroke: #66746d; stroke-width: .55; opacity: .38; vector-effect: non-scaling-stroke; }
@@ -426,6 +445,9 @@ h1, h2, h3, strong, .button { font-family: "Manrope", "DM Sans", sans-serif; }
 .cad-component-shape:hover > rect, .cad-component-shape:hover > polygon { fill-opacity: .83; }
 .cad-component-shape.is-selected > rect, .cad-component-shape.is-selected > polygon { fill: #c48357; fill-opacity: .82; stroke: #ffe0b7; stroke-width: 2.3; filter: drop-shadow(0 2px 5px rgb(0 0 0 / 35%)); }
 .cad-component-shape.is-locked { cursor: pointer; }
+.cad-pose-outline { stroke: #b9d0c1; stroke-width: 1.2; vector-effect: non-scaling-stroke; pointer-events: none; }
+.cad-component-shape:nth-of-type(2n) .cad-pose-outline { stroke: #d2b7a3; }
+.cad-component-shape.is-selected .cad-pose-outline { stroke: #ffe0b7; stroke-width: 2.3; }
 .cad-component-shape:focus-visible { outline: none; }
 .cad-component-shape:focus-visible > rect, .cad-component-shape:focus-visible > polygon { stroke: #f9d391; stroke-width: 3; }
 .cad-component-shape text { fill: #edf3ef; font: 600 8px "DM Sans", sans-serif; pointer-events: none; text-transform: capitalize; paint-order: stroke; stroke: #25302b; stroke-width: 2px; }

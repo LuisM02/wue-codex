@@ -1,8 +1,51 @@
-# WUE Codex Edition implementation roadmap
+# WUE implementation roadmap
 
 Work proceeds in small, tested modules. Each module receives focused service tests, API tests where relevant, a full regression run, and a clean commit before the next module begins.
 
-Current status: Modules 1 through 17, the parametric CAD editor, Module 18A, Module 18B1, Modules 19A through 19C, and Modules 20 through 24 complete. Version 0.24.0 is the verified multi-view reference baseline.
+Current status: Modules 1 through 17, the parametric CAD editor, Module 18A, Module 18B1, Modules 19A through 19C, and Modules 20 through 25 complete. Version 0.25.0 is the verified metric photo-calibration baseline.
+
+October 1 subsequent checkpoint: a separate approved approximate-size chair test
+now preserves six visible middle slats (14 proposed parts), rejects expanded
+floor/shadow masks, and uses the right elevation for chair Z placement. Both the
+initial eight-part draft and improved proposal remain unreviewed; the table demo
+is unchanged. Seat/apron separation, stock thickness, curved/leaning backrest
+depth and physical accuracy remain incomplete. Side-table aprons independently
+use side evidence. Feedback now verifies source-part identities so a same-ID
+analysis rerun cannot be mistaken for the saved drawing's original proposal.
+Latest observed: 43 frontend and 23 worker tests pass, build passes, startup
+readiness passes. Latest full backend result remains 348 passing; no backend
+changes in this checkpoint. This dirty working state is not a clean commit.
+Next priority: correct these chair geometry failures in a separate draft, align
+reference crops, obtain real measurements when possible, and rehearse the
+retained end-to-end demo before defense; defer risky new training architecture.
+
+Later October 1 follow-on: independent visible apron evidence now separates four
+chair aprons from the seat, and legs reach its underside. A third comparison
+copy (`Slatted chair seat-apron test (approx. size)`) has 18 parts, remains draft,
+and has four elevation reference crops; angled Top is uncalibrated. Median row
+depth reduces the swept-envelope error but the real overlapping slats remain
+over-thick, so this portion is only partially resolved. Worker tests now **30
+passed**. Prior frontend43/backend348/build results remain latest observed;
+none of those code modules changed in this follow-on. Table read-only probe,
+runtime readiness and diff whitespace check pass. The earlier 14-part chair is
+now user-finalized, preserved rather than rebuilt. Next: user review plus
+measured stock thickness/true overhead evidence when available; straight
+extrusion cannot yet reproduce rear lean or curved rail depth exactly.
+
+September 30 subsequent hardening checkpoint: stable-band table apron detection
+now rejects slab-only false panels while retaining small-overhang aprons. A fresh
+SAM probe of the real demo photos proposes nine parts without changing the saved
+finalized plan. The latest full regression passes 348 backend, 18 worker, and 35
+frontend tests plus the production build. Earlier test totals below are historical
+module checkpoints. Reconstruction accuracy evaluation and neural semantic part
+recognition remain incomplete; this checkpoint is not a new accuracy claim.
+
+Windows demo recovery now has an explicit local startup/readiness script at
+`scripts/start-wue.ps1`, with worker8010/API8011/frontend5174, conflict-safe
+service reuse, database/proxy/GPU-provider checks, and ignored local logs. Its
+18 safety checks pass and repeated startup was verified against healthy services.
+Full laptop-reboot recovery remains to be exercised; no installation, migration,
+automatic conflicting-process shutdown, or database reset is included.
 
 1. **Backend foundation (complete)** — FastAPI application factory, environment settings, PostgreSQL/SQLAlchemy session architecture, health endpoints, pytest setup, and project documentation.
 2. **Projects and furniture (complete)** — UUID-backed project and furniture models plus CRUD APIs constrained to chair, dining table, and bookshelf.
@@ -30,9 +73,25 @@ Current status: Modules 1 through 17, the parametric CAD editor, Module 18A, Mod
 19. **End-to-end hardening**
     - **19A — isolated real PostgreSQL verification (complete):** each integration session creates, migrates, tests, and removes a uniquely named disposable database, so retained rows in a shared test database cannot contaminate results. The complete 337-test backend suite passes on PostgreSQL 18.
     - **19B — contract and accessibility hardening (complete):** a shared manifest is exercised by every frontend API method and checked against FastAPI OpenAPI; expected optional 404s remain quiet while genuine partial-load failures identify the affected resource. CAD toolbar/toggle/status semantics and keyboard-only selection were verified in the live app.
-    - **19C — release regression (complete):** version 0.24.0 passes all 340 backend tests on PostgreSQL 18, all 12 reconstruction-worker tests, all 32 frontend tests, and the optimized production build. Its focused live CAD check rendered all 11 traced chair parts, verified the selected seat's topology controls, switched Side between the real Left/Right sources, loaded the real Top source, and mirrored references without geometry writes or browser console errors.
+    - **19C — release regression (complete):** version 0.25.0 passes all 348 backend tests on PostgreSQL 18, all 12 reconstruction-worker tests, all 33 frontend tests, and the optimized production build. Its focused CAD verification covers normalized crop conversion, persisted API calibration, PostgreSQL crop constraints, view-aware source selection, and the existing traced-part editor.
 20. **BOM-first costing workflow (complete)** — a dedicated post-3D bill of materials separates engineering quantities from the commercial quote, shows material and hardware summaries plus a per-part audit, carries selected purchasing stock into quotation costing, and provides first-run local wood, screw, and labor price setup without inventing market prices.
 21. **Human part-review gate (complete)** — every newly reconstructed draft opens with its front photograph and editable AI parts, records an explicit user confirmation, blocks finalization until that review exists, preserves approved copied revisions, and resets review when a revision is rebuilt from new photo analysis.
 22. **Traced-outline control points (complete)** — selected photo-derived polygons expose draggable Front-view vertices over the reference image, preserve point order and valid area, clamp edits to the component bounds, support optional 5 mm snapping, participate in Undo/Redo, and persist through the existing component API so the same edited outline drives 3D extrusion and material volume.
 23. **Outline topology and validity (complete)** — users can insert a midpoint after a selected vertex or on the longest edge, remove a selected vertex while retaining a valid polygon, and identify the active point visually or by keyboard. Shared frontend guards and authoritative backend validation reject zero-area, repeated-edge, or self-intersecting profiles before they can reach 3D or costing; invalid merged updates return HTTP 422.
 24. **Multi-view reference overlays (complete)** — Front can use Front/Back, Side can use Left/Right, and Top uses Top while every view continues editing one canonical X/Y/Z model. The current photograph can be toggled, switched, or mirrored independently without mutating stored images or geometry. View-aware reference selection is unit-tested and the live saved chair resolves each source through its verified image-content endpoint. These overlays are visual review aids, not perspective-correct metric measurements.
+25. **Metric photo calibration (complete)** — every uploaded view persists a normalized visible-furniture crop plus horizontal mirror state. The CAD calibration panel accepts left, right, top, and bottom photo margins, previews the alignment, validates that a visible object remains, and maps the resulting crop onto the measured overall width/height/depth bounds for Front, Side, and Top. Calibration is reusable across plan revisions and does not alter the source image, canonical component geometry, or AI input signature. This is an object-scale alignment aid, not camera pose estimation or perspective correction.
+
+October 1 rotation-consistency follow-on (newest frontend checkpoint): fixed
+traced 3D profiles rotating about a corner while CAD used a center, plus reversed
+Side/Top tilt signs. CAD now projects the center-pivot Euler-XYZ solid, including
+depth/height coupling and rotated selection/Fit/snap bounds, using existing
+rotation fields and no new dependencies/API/database schema. Properties remain
+editable; direct canvas resize/profile handles are intentionally unavailable for
+rotated parts until inverse-pose edits can be implemented safely. The temporary
+8-degree slat test was undone and API readback confirms all saved values restored
+and review null; no actual chair lean was inferred or persisted. Latest frontend
+suite **57 passing**, production build passes; lazy viewer warning ~852.86 kB.
+Latest prior worker30/backend348 unchanged, not rerun here. Next: supported
+photo-driven lean estimation and independently constrained stock thickness;
+curved-depth geometry and physical accuracy remain incomplete. Finalized source
+of truth and human review gate stay intact.

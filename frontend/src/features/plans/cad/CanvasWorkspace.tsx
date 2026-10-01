@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
 
-import type { ImageView, PlanComponent } from "../../../types/api";
+import type { FurnitureDimensions, FurnitureImageCalibrationPayload, ImageView, PlanComponent } from "../../../types/api";
+import { componentDrawing, hasComponentRotation } from "../../../lib/componentPose";
 import {
   VIEW_DEFINITIONS,
   applyProjectedPosition,
@@ -18,7 +19,7 @@ import {
   type OrthographicView,
   type ResizeHandle,
 } from "./editorGeometry";
-import type { ReferenceOption } from "./referencePhotos";
+import type { ReferenceImage, ReferenceOption } from "./referencePhotos";
 
 const CANVAS_WIDTH = 1000;
 const CANVAS_HEIGHT = 620;
@@ -29,14 +30,14 @@ const OUTLINE_SNAP_MM = 5;
 
 interface Props {
   components: PlanComponent[];
+  dimensions: FurnitureDimensions | null;
   selectedId: string | null;
   view: OrthographicView;
   locked: boolean;
   gridVisible: boolean;
   snapEnabled: boolean;
-  referenceImageUrl?: string;
+  referenceImage?: ReferenceImage;
   referenceView: ImageView | null;
-  referenceMirrored: boolean;
   referenceOptions: ReferenceOption[];
   photoVisible: boolean;
   zoom: number;
@@ -44,10 +45,18 @@ interface Props {
   onPan: (pan: { x: number; y: number }) => void;
   onZoom: (direction: 1 | -1) => void;
   onReference: (view: ImageView) => void;
-  onMirror: () => void;
+  onCalibration: (payload: FurnitureImageCalibrationPayload) => Promise<boolean>;
   onSelect: (id: string | null) => void;
   onPreview: (component: PlanComponent) => void;
   onCommit: (before: PlanComponent, after: PlanComponent) => void;
+}
+
+interface CalibrationMargins {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  isMirrored: boolean;
 }
 
 type Interaction =
@@ -69,16 +78,46 @@ function sameGeometry(first: PlanComponent, second: PlanComponent): boolean {
   return fields.every((field) => JSON.stringify(first[field]) === JSON.stringify(second[field]));
 }
 
+function roundRatio(value: number): string {
+  return (Math.round(value * 1_000_000) / 1_000_000).toFixed(6);
+}
+
+export function calibrationMargins(reference: ReferenceImage): CalibrationMargins {
+  const left = Number(reference.image.object_left_ratio) * 100;
+  const top = Number(reference.image.object_top_ratio) * 100;
+  return {
+    left,
+    right: Math.max(0, (1 - Number(reference.image.object_left_ratio) - Number(reference.image.object_width_ratio)) * 100),
+    top,
+    bottom: Math.max(0, (1 - Number(reference.image.object_top_ratio) - Number(reference.image.object_height_ratio)) * 100),
+    isMirrored: reference.image.is_mirrored,
+  };
+}
+
+export function calibrationPayload(margins: CalibrationMargins): FurnitureImageCalibrationPayload | null {
+  const horizontal = margins.left + margins.right;
+  const vertical = margins.top + margins.bottom;
+  if ([margins.left, margins.right, margins.top, margins.bottom].some((value) => !Number.isFinite(value) || value < 0)
+    || horizontal >= 100 || vertical >= 100) return null;
+  return {
+    object_left_ratio: roundRatio(margins.left / 100),
+    object_top_ratio: roundRatio(margins.top / 100),
+    object_width_ratio: roundRatio((100 - horizontal) / 100),
+    object_height_ratio: roundRatio((100 - vertical) / 100),
+    is_mirrored: margins.isMirrored,
+  };
+}
+
 export function CanvasWorkspace({
   components,
+  dimensions,
   selectedId,
   view,
   locked,
   gridVisible,
   snapEnabled,
-  referenceImageUrl,
+  referenceImage,
   referenceView,
-  referenceMirrored,
   referenceOptions,
   photoVisible,
   zoom,
@@ -86,7 +125,7 @@ export function CanvasWorkspace({
   onPan,
   onZoom,
   onReference,
-  onMirror,
+  onCalibration,
   onSelect,
   onPreview,
   onCommit,
@@ -94,7 +133,22 @@ export function CanvasWorkspace({
   const interaction = useRef<Interaction | null>(null);
   const [guides, setGuides] = useState<AxisGuide[]>([]);
   const [selectedProfilePoint, setSelectedProfilePoint] = useState<number | null>(null);
-  const bounds = useMemo(() => projectionBounds(components, view), [components, view]);
+  const [calibrationOpen, setCalibrationOpen] = useState(false);
+  const [calibrationDraft, setCalibrationDraft] = useState<CalibrationMargins | null>(null);
+  const overallHorizontal = dimensions
+    ? Number(view === "side" ? dimensions.depth_mm : dimensions.width_mm)
+    : null;
+  const overallVertical = dimensions
+    ? Number(view === "top" ? dimensions.depth_mm : dimensions.height_mm)
+    : null;
+  const bounds = useMemo(() => {
+    const componentBounds = projectionBounds(components, view);
+    return {
+      ...componentBounds,
+      maxHorizontal: Math.max(componentBounds.maxHorizontal, overallHorizontal ?? 0),
+      maxVertical: Math.max(componentBounds.maxVertical, overallVertical ?? 0),
+    };
+  }, [components, overallHorizontal, overallVertical, view]);
   const spanHorizontal = Math.max(1, bounds.maxHorizontal - bounds.minHorizontal);
   const spanVertical = Math.max(1, bounds.maxVertical - bounds.minVertical);
   const fitScale = Math.min(
@@ -109,12 +163,43 @@ export function CanvasWorkspace({
   const definition = VIEW_DEFINITIONS[view];
   const selected = components.find((component) => component.id === selectedId) ?? null;
   const selectedProjection = selected ? projectComponent(selected, view) : null;
+  const selectedPoseEditable = !selected || !hasComponentRotation(selected);
   const visibleGridSpacing = GRID_SPACING_MM * Math.max(1, Math.ceil(20 / Math.max(GRID_SPACING_MM * scale, 1)));
   const gridPixels = visibleGridSpacing * scale;
+  const storedCalibration = referenceImage ? calibrationPayload(calibrationMargins(referenceImage)) : null;
+  const draftCalibration = calibrationDraft ? calibrationPayload(calibrationDraft) : null;
+  const activeCalibration = calibrationOpen && draftCalibration ? draftCalibration : storedCalibration;
+  const targetWidth = (overallHorizontal ?? spanHorizontal) * scale;
+  const targetHeight = (overallVertical ?? spanVertical) * scale;
+  const targetLeft = toScreenHorizontal(0);
+  const targetTop = toScreenVertical(overallVertical ?? bounds.maxVertical);
+  const photoWidth = activeCalibration ? targetWidth / Number(activeCalibration.object_width_ratio) : CANVAS_WIDTH;
+  const photoHeight = activeCalibration ? targetHeight / Number(activeCalibration.object_height_ratio) : CANVAS_HEIGHT;
+  const displayedLeftRatio = activeCalibration ? Number(activeCalibration.object_left_ratio) : 0;
+  const sourceLeftRatio = activeCalibration?.is_mirrored
+    ? 1 - displayedLeftRatio - Number(activeCalibration.object_width_ratio)
+    : displayedLeftRatio;
+  const photoX = activeCalibration ? targetLeft - sourceLeftRatio * photoWidth : 0;
+  const photoY = activeCalibration ? targetTop - Number(activeCalibration.object_top_ratio) * photoHeight : 0;
+  const photoMirrorCenter = targetLeft + targetWidth / 2;
 
   useEffect(() => {
     setSelectedProfilePoint(null);
   }, [selectedId, view]);
+
+  useEffect(() => {
+    setCalibrationOpen(false);
+    setCalibrationDraft(referenceImage ? calibrationMargins(referenceImage) : null);
+  }, [referenceImage?.image.id, referenceImage?.image.updated_at]);
+
+  async function saveCalibration(payload: FurnitureImageCalibrationPayload | null) {
+    if (!payload) return;
+    if (await onCalibration(payload)) setCalibrationOpen(false);
+  }
+
+  function updateCalibrationMargin(field: keyof Omit<CalibrationMargins, "isMirrored">, value: number) {
+    setCalibrationDraft((current) => current ? { ...current, [field]: value } : current);
+  }
 
   function beginMove(event: ReactPointerEvent<SVGGElement>, component: PlanComponent) {
     event.stopPropagation();
@@ -128,7 +213,7 @@ export function CanvasWorkspace({
 
   function beginResize(event: ReactPointerEvent<SVGRectElement>, component: PlanComponent, handle: ResizeHandle) {
     event.stopPropagation();
-    if (locked || event.button !== 0) return;
+    if (locked || hasComponentRotation(component) || event.button !== 0) return;
     const point = clientPoint(event);
     interaction.current = { type: "resize", pointerId: event.pointerId, start: point, before: component, handle };
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -136,7 +221,7 @@ export function CanvasWorkspace({
 
   function beginProfilePoint(event: ReactPointerEvent<SVGCircleElement>, component: PlanComponent, pointIndex: number) {
     event.stopPropagation();
-    if (locked || event.button !== 0) return;
+    if (locked || hasComponentRotation(component) || event.button !== 0) return;
     setSelectedProfilePoint(pointIndex);
     interaction.current = {
       type: "profile-point",
@@ -232,7 +317,7 @@ export function CanvasWorkspace({
   }
 
   function addOutlinePoint() {
-    if (locked || view !== "front" || !selected?.profile_points) return;
+    if (locked || !selectedPoseEditable || view !== "front" || !selected?.profile_points) return;
     const edgeIndex = selectedProfilePoint ?? longestProfileEdgeIndex(selected.profile_points);
     const after = insertProfilePoint(selected, edgeIndex);
     if (sameGeometry(selected, after)) return;
@@ -242,7 +327,7 @@ export function CanvasWorkspace({
   }
 
   function removeOutlinePoint(pointIndex = selectedProfilePoint) {
-    if (locked || view !== "front" || !selected || pointIndex === null) return;
+    if (locked || !selectedPoseEditable || view !== "front" || !selected || pointIndex === null) return;
     const after = removeProfilePoint(selected, pointIndex);
     if (sameGeometry(selected, after)) return;
     onPreview(after);
@@ -271,7 +356,52 @@ export function CanvasWorkspace({
                 {referenceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
-            <button type="button" aria-pressed={referenceMirrored} onClick={onMirror} title="Mirror the reference photograph horizontally">↔ Mirror</button>
+            <button
+              type="button"
+              aria-pressed={Boolean(activeCalibration?.is_mirrored)}
+              onClick={() => {
+                if (!referenceImage) return;
+                if (calibrationOpen && calibrationDraft) {
+                  setCalibrationDraft({ ...calibrationDraft, isMirrored: !calibrationDraft.isMirrored });
+                } else if (storedCalibration) {
+                  void saveCalibration({ ...storedCalibration, is_mirrored: !storedCalibration.is_mirrored });
+                }
+              }}
+              title="Mirror the reference photograph horizontally"
+            >↔ Mirror</button>
+            <button type="button" aria-expanded={calibrationOpen} onClick={() => setCalibrationOpen((open) => !open)}>Calibrate</button>
+            {calibrationOpen && calibrationDraft && (
+              <div className="cad-calibration-panel">
+                <strong>Furniture margins in photo</strong>
+                <p>Trim empty space so the photographed object aligns to the measured size.</p>
+                <div className="cad-calibration-grid">
+                  {(["left", "right", "top", "bottom"] as const).map((field) => (
+                    <label key={field}>
+                      <span>{field}</span>
+                      <input
+                        aria-label={`${field} photo margin percent`}
+                        type="number"
+                        min="0"
+                        max="99"
+                        step="0.5"
+                        value={Math.round(calibrationDraft[field] * 100) / 100}
+                        onChange={(event) => updateCalibrationMargin(field, Number(event.target.value))}
+                      />
+                      <i>%</i>
+                    </label>
+                  ))}
+                </div>
+                {!draftCalibration && <small>Opposite margins must leave part of the furniture visible.</small>}
+                <div className="cad-calibration-actions">
+                  <button type="button" onClick={() => {
+                    const reset = { left: 0, right: 0, top: 0, bottom: 0, isMirrored: false };
+                    setCalibrationDraft(reset);
+                    void saveCalibration(calibrationPayload(reset));
+                  }}>Reset</button>
+                  <button type="button" disabled={!draftCalibration} onClick={() => void saveCalibration(draftCalibration)}>Save alignment</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
         <svg
@@ -293,17 +423,17 @@ export function CanvasWorkspace({
           </defs>
           <rect className="cad-canvas-background" width={CANVAS_WIDTH} height={CANVAS_HEIGHT} onPointerDown={beginCanvas} />
           {gridVisible && <rect className="cad-grid" width={CANVAS_WIDTH} height={CANVAS_HEIGHT} fill="url(#cad-minor-grid)" pointerEvents="none" />}
-          {referenceImageUrl && photoVisible && (
+          {referenceImage && photoVisible && (
             <image
-              href={referenceImageUrl}
-              x="0"
-              y="0"
-              width={CANVAS_WIDTH}
-              height={CANVAS_HEIGHT}
-              preserveAspectRatio="xMidYMid meet"
+              href={referenceImage.url}
+              x={photoX}
+              y={photoY}
+              width={photoWidth}
+              height={photoHeight}
+              preserveAspectRatio="none"
               className="cad-reference-photo"
               pointerEvents="none"
-              transform={referenceMirrored ? `translate(${CANVAS_WIDTH} 0) scale(-1 1)` : undefined}
+              transform={activeCalibration?.is_mirrored ? `translate(${photoMirrorCenter * 2} 0) scale(-1 1)` : undefined}
             />
           )}
           {view !== "top" && (
@@ -322,7 +452,8 @@ export function CanvasWorkspace({
             const height = Math.max(2, projected.height * scale);
             const centerX = left + width / 2;
             const centerY = top + height / 2;
-            const rotation = view === "front" ? -Number(component.rotation_z) : view === "side" ? -Number(component.rotation_x) : -Number(component.rotation_y);
+            const rotated = hasComponentRotation(component);
+            const drawing = rotated ? componentDrawing(component, view) : null;
             const selectedShape = component.id === selectedId;
             const polygon = view === "front" && component.geometry_kind === "extruded_profile" && component.profile_points
               ? component.profile_points.map((point) => `${left + Number(point.u) * scale},${toScreenVertical(projected.vertical + Number(point.v))}`).join(" ")
@@ -331,14 +462,24 @@ export function CanvasWorkspace({
               <g
                 key={component.id}
                 className={`cad-component-shape${selectedShape ? " is-selected" : ""}${locked ? " is-locked" : ""}`}
-                transform={rotation ? `rotate(${rotation} ${centerX} ${centerY})` : undefined}
                 onPointerDown={(event) => beginMove(event, component)}
                 tabIndex={0}
                 role="button"
                 aria-label={`Select ${component.component_name.replaceAll("_", " ")}`}
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onSelect(component.id); }}
               >
-                {polygon ? <polygon points={polygon} /> : <rect x={left} y={top} width={width} height={height} rx="1.5" />}
+                {drawing ? <>
+                  {drawing.faces.map((face, index) => <polygon
+                    key={`face-${index}`}
+                    points={face.map((point) => `${toScreenHorizontal(point.horizontal)},${toScreenVertical(point.vertical)}`).join(" ")}
+                    style={{ stroke: "none", filter: "none" }}
+                  />)}
+                  {drawing.edges.map(([first, second], index) => <line
+                    key={`edge-${index}`} className="cad-pose-outline"
+                    x1={toScreenHorizontal(first.horizontal)} y1={toScreenVertical(first.vertical)}
+                    x2={toScreenHorizontal(second.horizontal)} y2={toScreenVertical(second.vertical)}
+                  />)}
+                </> : polygon ? <polygon points={polygon} /> : <rect x={left} y={top} width={width} height={height} rx="1.5" />}
                 {width > 52 && height > 22 && <text x={centerX} y={centerY + 3} textAnchor="middle">{component.component_name.replaceAll("_", " ")}</text>}
               </g>
             );
@@ -357,7 +498,7 @@ export function CanvasWorkspace({
             return (
               <g className="cad-selection-overlay">
                 <rect x={left} y={top} width={Math.max(2, right - left)} height={Math.max(2, bottom - top)} className="cad-selection-box" />
-                {!locked && handles.map(([handle, x, y]) => (
+                {!locked && selectedPoseEditable && handles.map(([handle, x, y]) => (
                   <rect
                     key={handle}
                     x={x - 5}
@@ -369,7 +510,7 @@ export function CanvasWorkspace({
                     onPointerDown={(event) => beginResize(event, selected, handle)}
                   />
                 ))}
-                {!locked && view === "front" && selected.profile_points?.map((point, pointIndex) => (
+                {!locked && selectedPoseEditable && view === "front" && selected.profile_points?.map((point, pointIndex) => (
                   <circle
                     key={`profile-point-${pointIndex}`}
                     cx={toScreenHorizontal(selectedProjection.horizontal + Number(point.u))}
@@ -415,11 +556,13 @@ export function CanvasWorkspace({
       </div>
       <footer className="cad-statusbar">
         <span>{locked
-          ? "Read-only inspection"
+          ? selectedPoseEditable ? "Read-only inspection" : "Read-only · projected bounds · local dimensions in Properties"
+          : !selectedPoseEditable
+            ? "Rotated part · drag to move · edit size/angles in Properties · shown dimensions are projected bounds"
           : view === "front" && selected?.profile_points
             ? "Drag round points to reshape the traced outline · square handles resize the whole part"
             : "Drag parts · drag corner handles to resize · Alt-drag or middle-drag to pan"}</span>
-        {view === "front" && selected?.profile_points && !locked ? (
+        {view === "front" && selectedPoseEditable && selected?.profile_points && !locked ? (
           <div className="cad-outline-actions" role="toolbar" aria-label="Traced outline points">
             <span>{selected.profile_points.length} points</span>
             <button type="button" onClick={addOutlinePoint} disabled={selected.profile_points.length >= 256}>＋ Add point</button>
@@ -427,7 +570,7 @@ export function CanvasWorkspace({
           </div>
         ) : <span>{definition.horizontalLabel} horizontal · {definition.verticalLabel} vertical</span>}
         <span>Grid {visibleGridSpacing} mm · {snapEnabled
-          ? view === "front" && selected?.profile_points
+          ? view === "front" && selectedPoseEditable && selected?.profile_points
             ? `Outline snap ${OUTLINE_SNAP_MM} mm`
             : `Snap ${GRID_SPACING_MM} mm`
           : "Snap off"}</span>

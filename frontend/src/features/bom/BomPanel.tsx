@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { BusyLabel, Notice, SectionHeading } from "../../components/Feedback";
-import { isWoodScrewMaterial } from "../../lib/catalog";
+import { isDemoCatalogName, isWoodScrewMaterial } from "../../lib/catalog";
 import { formatDate, formatNumber, unitLabel } from "../../lib/format";
 import { api } from "../../services/apiClient";
 import type {
@@ -99,6 +99,7 @@ export function BomPanel({ furniture, plan, initialSelection, onContinue }: Prop
   const setupReady = (woods.length > 0 || Boolean(woodName.trim() && woodPrice.trim()))
     && (hardware.length > 0 || Boolean(screwPrice.trim()));
   const ready = Boolean(selection && materialCost && hardwareCost);
+  const usesDemoPrices = isDemoCatalogName(woods.find((item) => item.id === woodId)?.material_name);
   const estimatedTotal = Number(materialCost?.total_cost ?? 0) + Number(hardwareCost?.total_cost ?? 0);
 
   async function createStarterCatalog() {
@@ -152,10 +153,11 @@ export function BomPanel({ furniture, plan, initialSelection, onContinue }: Prop
         <span className="status-badge status-badge--finalized">Plan revision {plan.revision}</span>
       </SectionHeading>
       <p className="section-intro">
-        WUE converts the finalized CAD parts into purchasing quantities. Select the actual stock and hardware before labor, markup, and tax are added in the quote.
+        WUE converts the finalized CAD parts into net material quantities. Select stock and hardware prices, then add labor in the quote.
       </p>
 
       {error && <Notice tone="danger">{error}</Notice>}
+      {usesDemoPrices && <Notice tone="warning">Demonstration prices selected. These sample values illustrate the calculation and are not supplier prices.</Notice>}
       {!catalogReady && busy !== "load" && (
         <Notice tone="warning">
           Your local purchasing catalog is incomplete. Add the missing starter prices below; these values stay on this computer and can be expanded later.
@@ -214,7 +216,7 @@ export function BomPanel({ furniture, plan, initialSelection, onContinue }: Prop
           <div className="bom-running-total">
             <small>Materials subtotal</small>
             <strong>{ready ? formatNumber(estimatedTotal) : "—"}</strong>
-            <span>Before labor and quote adjustments</span>
+            <span>Before labor</span>
           </div>
         </div>
       </div>
@@ -260,6 +262,9 @@ export function BomPanel({ furniture, plan, initialSelection, onContinue }: Prop
           </table>
         </div>
         {hardwareCost && <p className="bom-price-note">Price effective {formatDate(hardwareCost.price_effective_date)} · quantities follow the current connection rule.</p>}
+        {plan.furniture_type === "dining_table" && plan.components.some((part) => part.component_name.endsWith("_apron")) && (
+          <p className="bom-price-note">Prototype hardware rule: two screws per leg connection. Separate apron joints are not itemized yet.</p>
+        )}
       </div>
 
       <div className="bom-section">
@@ -287,7 +292,7 @@ export function BomPanel({ furniture, plan, initialSelection, onContinue }: Prop
       </div>
 
       <div className="section-footer">
-        <div><small>Engineering source</small><strong>{furniture.name} · finalized revision {plan.revision}</strong></div>
+        <div><small>Net modeled volume · cutting waste and stock layout require review</small><strong>{furniture.name} · finalized revision {plan.revision}</strong></div>
         <button className="button button--primary" disabled={!ready || !selection} onClick={() => selection && onContinue(selection)}>
           Continue to quote <span>→</span>
         </button>

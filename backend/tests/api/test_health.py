@@ -31,7 +31,7 @@ def test_service_health_does_not_require_database(client: TestClient) -> None:
     assert response.json() == {
         "status": "ok",
         "service": "WUE API",
-        "version": "0.24.0",
+        "version": "0.25.0",
     }
 
 

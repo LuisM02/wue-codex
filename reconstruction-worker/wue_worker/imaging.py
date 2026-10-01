@@ -38,6 +38,7 @@ class AnalyzedView:
     foreground_pixels: int
     checksum_sha256: str
     grayscale: bytes
+    segmentation_warning: str | None = None
 
     @property
     def object_width(self) -> int:
@@ -126,6 +127,30 @@ def _clean_mask(raw: bytearray, width: int, height: int) -> bytearray:
     return cleaned
 
 
+def _neural_mask_fills_open_space(
+    seed_pixels: int,
+    seed_bbox: tuple[int, int, int, int],
+    refined: bytearray,
+    width: int,
+    height: int,
+) -> bool:
+    """Keep a clear foreground silhouette when a box prompt floods its openings."""
+    refined_pixels = sum(refined)
+    left, top, right, bottom = seed_bbox
+    seed_area = max(1, (right - left) * (bottom - top))
+    if seed_pixels / seed_area >= 0.65 or refined_pixels <= seed_pixels * 1.6:
+        return False
+    indices = [index for index, value in enumerate(refined) if value]
+    if not indices:
+        return False
+    xs = [index % width for index in indices]
+    ys = [index // width for index in indices]
+    refined_area = (max(xs) - min(xs) + 1) * (max(ys) - min(ys) + 1)
+    # A mask can also absorb the floor/shadow without becoming a solid box.
+    # Large expansion around an already clear sparse seed is not reliable.
+    return refined_pixels / refined_area >= 0.70 or refined_area > seed_area * 1.35
+
+
 def analyze_image(
     name: str,
     data: bytes,
@@ -175,6 +200,7 @@ def analyze_image(
     seed_xs = [index % width for index in seed_indices]
     seed_ys = [index // width for index in seed_indices]
     seed_bbox = (min(seed_xs), min(seed_ys), max(seed_xs) + 1, max(seed_ys) + 1)
+    segmentation_warning = None
     if segmentation is not None:
         seed_mask = bytes(mask)
         refined = segmentation.refine_mask(name, image, seed_mask, seed_bbox)
@@ -183,12 +209,21 @@ def analyze_image(
                 f"The segmentation provider returned an invalid {name} mask"
             )
         if refined != seed_mask:
-            mask, object_pixels = _largest_component(
+            refined_mask, refined_pixels = _largest_component(
                 _clean_mask(bytearray(refined), width, height), width, height
             )
-            if object_pixels < width * height * 0.012:
+            if refined_pixels < width * height * 0.012:
                 raise ImageSetRejected(
                     f"No clear furniture-sized foreground object was found in the {name} view"
+                )
+            if not _neural_mask_fills_open_space(
+                object_pixels, seed_bbox, refined_mask, width, height
+            ):
+                mask, object_pixels = refined_mask, refined_pixels
+            else:
+                segmentation_warning = (
+                    f"The neural mask filled open space in the {name} view; "
+                    "the clearer foreground silhouette was used instead"
                 )
     indices = [index for index, value in enumerate(mask) if value]
     xs = [index % width for index in indices]
@@ -224,6 +259,7 @@ def analyze_image(
         foreground_pixels=foreground_pixels,
         checksum_sha256=hashlib.sha256(data).hexdigest(),
         grayscale=grayscale,
+        segmentation_warning=segmentation_warning,
     )
 
 

@@ -7,8 +7,9 @@ from io import BytesIO
 
 import pytest
 from fastapi.testclient import TestClient
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
+from wue_worker.imaging import analyze_image
 from wue_worker.main import app
 from wue_worker.segmentation import (
     BaselineSegmentationProvider,
@@ -77,20 +78,52 @@ def _chair_image(view: str, *, variant: int = 0) -> bytes:
     return output.getvalue()
 
 
-def _table_image(view: str) -> bytes:
+def _table_image(
+    view: str, *, aprons: bool = True, side_aprons: bool | None = None,
+    inset: int = 0, small_overhang: bool = False, side_apron_height: int = 20,
+) -> bytes:
     image = Image.new("RGB", (280, 240), "#f7f5ef")
     draw = ImageDraw.Draw(image)
     wood = "#68412b"
     if view in {"front", "back"}:
         draw.rounded_rectangle((25, 40, 255, 66), radius=7, fill=wood)
-        draw.polygon([(48, 62), (73, 62), (68, 218), (54, 218)], fill=wood)
-        draw.polygon([(207, 62), (232, 62), (226, 218), (212, 218)], fill=wood)
+        if aprons:
+            draw.rectangle((27, 62, 253, 82) if small_overhang else (48 + inset, 62, 232 - inset, 82), fill=wood)
+        draw.polygon([(48 + inset, 62), (73 + inset, 62), (68 + inset, 218), (54 + inset, 218)], fill=wood)
+        draw.polygon([(207 - inset, 62), (232 - inset, 62), (226 - inset, 218), (212 - inset, 218)], fill=wood)
     elif view in {"left", "right"}:
         draw.rounded_rectangle((55, 40, 205, 66), radius=7, fill=wood)
+        if (aprons if side_aprons is None else side_aprons):
+            draw.rectangle((58, 62, 202, 62 + side_apron_height) if small_overhang else (72, 62, 190, 62 + side_apron_height), fill=wood)
         draw.polygon([(72, 62), (96, 62), (91, 218), (78, 218)], fill=wood)
         draw.polygon([(166, 62), (190, 62), (184, 218), (172, 218)], fill=wood)
     else:
         draw.rounded_rectangle((20, 60, 260, 180), radius=9, fill=wood)
+    marker = VIEWS.index(view) * 3
+    draw.rectangle((8 + marker, 8, 9 + marker, 9), fill="#d8d5cd")
+    output = BytesIO()
+    image.save(output, "PNG")
+    return output.getvalue()
+
+
+def _slatted_chair_image(view: str) -> bytes:
+    image = Image.new("RGB", (240, 240), "#f7f5ef")
+    draw = ImageDraw.Draw(image)
+    wood = "#68412b"
+    if view in {"front", "back"}:
+        draw.rectangle((48, 22, 192, 42), fill=wood)
+        for x in (52, 78, 104, 130, 156, 182):
+            draw.rectangle((x, 38, x + 8, 112), fill=wood)
+        draw.rectangle((42, 108, 198, 126), fill=wood)
+        draw.polygon([(53, 122), (72, 122), (65, 220), (52, 220)], fill=wood)
+        draw.polygon([(168, 122), (188, 122), (185, 220), (173, 220)], fill=wood)
+    elif view in {"left", "right"}:
+        draw.rectangle((150, 22, 172, 112), fill=wood)
+        draw.rectangle((48, 108, 184, 126), fill=wood)
+        draw.rectangle((55, 122, 72, 220), fill=wood)
+        draw.rectangle((160, 122, 177, 220), fill=wood)
+    else:
+        draw.rounded_rectangle((45, 58, 195, 182), radius=12, fill=wood)
     marker = VIEWS.index(view) * 3
     draw.rectangle((8 + marker, 8, 9 + marker, 9), fill="#d8d5cd")
     output = BytesIO()
@@ -317,6 +350,235 @@ def test_table_and_bookshelf_use_their_observed_structural_bands(
             part["component_name"] for part in reconstructed.json()["parts"]
         }
         assert required_part in names
+        if furniture_type == "dining_table":
+            assert {
+                "front_left_leg",
+                "front_right_leg",
+                "rear_left_leg",
+                "rear_right_leg",
+                "front_apron",
+                "rear_apron",
+                "left_apron",
+                "right_apron",
+            } <= names
+            table_parts = {
+                part["component_name"]: part
+                for part in reconstructed.json()["parts"]
+            }
+            assert table_parts["tabletop"]["height"] <= dimensions[1] * 0.07
+            assert table_parts["front_left_leg"]["height"] >= dimensions[1] * 0.9
+
+
+def test_table_without_visible_aprons_does_not_invent_panels(client: TestClient) -> None:
+    files, manifest = _files_for(lambda view: _table_image(view, aprons=False))
+    response = client.post(
+        "/v1/reconstruct",
+        files=files,
+        data={
+            "furniture_type": "dining_table",
+            "width_mm": "1800",
+            "height_mm": "750",
+            "depth_mm": "900",
+            "image_manifest": json.dumps(manifest),
+        },
+    )
+    assert response.status_code == 200, response.text
+    names = {part["component_name"] for part in response.json()["parts"]}
+    assert names == {
+        "tabletop", "front_left_leg", "front_right_leg",
+        "rear_left_leg", "rear_right_leg",
+    }
+
+
+def test_table_aprons_with_small_overhang_are_retained(client: TestClient) -> None:
+    files, manifest = _files_for(lambda view: _table_image(view, small_overhang=True))
+    response = client.post(
+        "/v1/reconstruct",
+        files=files,
+        data={
+            "furniture_type": "dining_table", "width_mm": "1800",
+            "height_mm": "750", "depth_mm": "900",
+            "image_manifest": json.dumps(manifest),
+        },
+    )
+    assert response.status_code == 200, response.text
+    names = {part["component_name"] for part in response.json()["parts"]}
+    assert {"front_apron", "rear_apron", "left_apron", "right_apron"} <= names
+
+
+def test_side_aprons_require_side_view_evidence(client: TestClient) -> None:
+    files, manifest = _files_for(lambda view: _table_image(view, side_aprons=False))
+    response = client.post(
+        "/v1/reconstruct",
+        files=files,
+        data={
+            "furniture_type": "dining_table",
+            "width_mm": "1800",
+            "height_mm": "750",
+            "depth_mm": "900",
+            "image_manifest": json.dumps(manifest),
+        },
+    )
+    assert response.status_code == 200, response.text
+    names = {part["component_name"] for part in response.json()["parts"]}
+    assert {"front_apron", "rear_apron"} <= names
+    assert "left_apron" not in names
+    assert "right_apron" not in names
+
+
+def test_new_table_leg_spacing_changes_geometry(client: TestClient) -> None:
+    proposed = []
+    for inset in (0, 22):
+        files, manifest = _files_for(lambda view: _table_image(view, inset=inset))
+        response = client.post(
+            "/v1/reconstruct",
+            files=files,
+            data={
+                "furniture_type": "dining_table",
+                "width_mm": "1800",
+                "height_mm": "750",
+                "depth_mm": "900",
+                "image_manifest": json.dumps(manifest),
+            },
+        )
+        assert response.status_code == 200, response.text
+        proposed.append({part["component_name"]: part for part in response.json()["parts"]})
+    assert proposed[1]["front_left_leg"]["x"] > proposed[0]["front_left_leg"]["x"] + 100
+    assert proposed[1]["front_right_leg"]["x"] < proposed[0]["front_right_leg"]["x"] - 100
+    assert proposed[0]["tabletop"]["width"] == proposed[1]["tabletop"]["width"]
+
+
+def test_side_aprons_do_not_require_a_visible_front_apron(client: TestClient) -> None:
+    files, manifest = _files_for(lambda view: _table_image(view, aprons=False, side_aprons=True))
+    response = client.post(
+        "/v1/reconstruct", files=files,
+        data={
+            "furniture_type": "dining_table", "width_mm": "1800",
+            "height_mm": "750", "depth_mm": "900",
+            "image_manifest": json.dumps(manifest),
+        },
+    )
+    assert response.status_code == 200, response.text
+    parts = {part["component_name"]: part for part in response.json()["parts"]}
+    assert {"left_apron", "right_apron"} <= parts.keys()
+    assert "front_apron" not in parts and "rear_apron" not in parts
+    for name in ("left_apron", "right_apron"):
+        assert parts[name]["height"] > 10
+        assert parts[name]["y"] + parts[name]["height"] <= 750.001
+
+
+def test_side_apron_height_comes_from_its_own_view(client: TestClient) -> None:
+    proposals = []
+    for apron_height in (12, 32):
+        files, manifest = _files_for(lambda view: _table_image(view, side_apron_height=apron_height))
+        response = client.post(
+            "/v1/reconstruct", files=files,
+            data={
+                "furniture_type": "dining_table", "width_mm": "1800",
+                "height_mm": "750", "depth_mm": "900",
+                "image_manifest": json.dumps(manifest),
+            },
+        )
+        assert response.status_code == 200, response.text
+        proposals.append({part["component_name"]: part for part in response.json()["parts"]})
+    assert proposals[1]["left_apron"]["height"] > proposals[0]["left_apron"]["height"] + 40
+    assert proposals[1]["front_apron"]["height"] == proposals[0]["front_apron"]["height"]
+
+
+def test_neural_box_mask_cannot_fill_open_table_space() -> None:
+    class FloodedMaskProvider(BaselineSegmentationProvider):
+        def refine_mask(self, view_name, image, seed_mask, seed_bbox):
+            del view_name, seed_mask
+            left, top, right, bottom = seed_bbox
+            mask = bytearray(image.width * image.height)
+            for y in range(top, bottom):
+                mask[y * image.width + left : y * image.width + right] = (
+                    b"\x01" * (right - left)
+                )
+            return bytes(mask)
+
+    photo = _table_image("front")
+    baseline = analyze_image("front", photo)
+    refined = analyze_image("front", photo, FloodedMaskProvider())
+    assert refined.mask == baseline.mask
+    assert refined.segmentation_warning is not None
+
+
+def test_expanded_neural_mask_cannot_absorb_the_floor() -> None:
+    class FloorMaskProvider(BaselineSegmentationProvider):
+        def refine_mask(self, view_name, image, seed_mask, bbox):
+            expanded = bytearray(seed_mask)
+            for y in range(160, 235):
+                expanded[y * image.width + 20:y * image.width + 225] = b"\x01" * 205
+            return bytes(expanded)
+
+    photo = _chair_image("left")
+    baseline = analyze_image("left", photo)
+    refined = analyze_image("left", photo, FloorMaskProvider())
+    assert refined.mask == baseline.mask
+    assert refined.segmentation_warning is not None
+
+
+def test_slatted_backrest_keeps_its_internal_parts(client: TestClient) -> None:
+    files, manifest = _files_for(_slatted_chair_image)
+    response = client.post(
+        "/v1/reconstruct", files=files,
+        data={
+            "furniture_type": "chair", "width_mm": "450",
+            "height_mm": "900", "depth_mm": "500",
+            "image_manifest": json.dumps(manifest),
+        },
+    )
+    assert response.status_code == 200, response.text
+    names = {part["component_name"] for part in response.json()["parts"]}
+    assert {"left_backrest_post", "right_backrest_post"} <= names
+    assert {f"backrest_slat_{index}" for index in range(1, 5)} <= names
+    assert len([name for name in names if name.startswith("backrest_slat_")]) == 4
+    assert len([part for part in response.json()["parts"] if part["component_type"] == "leg"]) == 4
+
+
+def test_chair_backrest_uses_canonical_right_elevation_depth(client: TestClient) -> None:
+    def photos(view):
+        data = _chair_image(view)
+        if view != "left":
+            return data
+        with Image.open(BytesIO(data)) as image:
+            output = BytesIO()
+            ImageOps.mirror(image).save(output, "PNG")
+            return output.getvalue()
+
+    files, manifest = _files_for(photos)
+    response = client.post(
+        "/v1/reconstruct", files=files,
+        data={
+            "furniture_type": "chair", "width_mm": "450",
+            "height_mm": "900", "depth_mm": "500",
+            "image_manifest": json.dumps(manifest),
+        },
+    )
+    assert response.status_code == 200, response.text
+    backrest = next(part for part in response.json()["parts"] if part["component_name"] == "backrest")
+    assert backrest["z"] > 250
+
+
+def test_table_dimension_photo_conflict_is_reported(client: TestClient) -> None:
+    files, manifest = _files_for(_table_image)
+    response = client.post(
+        "/v1/reconstruct",
+        files=files,
+        data={
+            "furniture_type": "dining_table",
+            "width_mm": "450",
+            "height_mm": "900",
+            "depth_mm": "500",
+            "image_manifest": json.dumps(manifest),
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert any(
+        "width and height strongly disagree" in warning
+        for warning in response.json()["warnings"]
+    )
 
 
 def test_duplicate_views_and_blank_images_are_rejected(client: TestClient) -> None:

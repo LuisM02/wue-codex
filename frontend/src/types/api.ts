@@ -37,9 +37,23 @@ export interface FurnitureImage {
   checksum_sha256: string;
   pixel_width: number;
   pixel_height: number;
+  object_left_ratio: DecimalString;
+  object_top_ratio: DecimalString;
+  object_width_ratio: DecimalString;
+  object_height_ratio: DecimalString;
+  is_mirrored: boolean;
   created_at: string;
   updated_at: string;
 }
+
+export type FurnitureImageCalibrationPayload = Pick<
+  FurnitureImage,
+  | "object_left_ratio"
+  | "object_top_ratio"
+  | "object_width_ratio"
+  | "object_height_ratio"
+  | "is_mirrored"
+>;
 
 export interface FurnitureClassification {
   id: UUID;

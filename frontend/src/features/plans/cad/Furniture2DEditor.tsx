@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { FurniturePlan, ImageView, PlanComponent } from "../../../types/api";
+import type { FurnitureDimensions, FurnitureImageCalibrationPayload, FurniturePlan, ImageView, PlanComponent } from "../../../types/api";
 import { CanvasWorkspace } from "./CanvasWorkspace";
 import { ComponentPanel } from "./ComponentPanel";
 import { EditorToolbar } from "./EditorToolbar";
@@ -10,19 +10,21 @@ import { PropertiesPanel } from "./PropertiesPanel";
 import {
   initialReferenceByView,
   referenceOptionsForView,
-  type ReferenceImageUrls,
+  type ReferenceImages,
 } from "./referencePhotos";
 
 interface Props {
   plan: FurniturePlan;
+  dimensions: FurnitureDimensions | null;
   components: PlanComponent[];
-  referenceImageUrls: ReferenceImageUrls;
+  referenceImages: ReferenceImages;
   busy: string | null;
   reviewMode: boolean;
   onPreview: (component: PlanComponent) => void;
   onPersist: (before: PlanComponent, after: PlanComponent) => Promise<PlanComponent | null>;
   onAdd: () => Promise<PlanComponent | null>;
   onDelete: (component: PlanComponent) => Promise<boolean>;
+  onCalibrate: (view: ImageView, payload: FurnitureImageCalibrationPayload) => Promise<boolean>;
   onReview: () => void;
   onFinish: () => void;
 }
@@ -32,14 +34,16 @@ const MAX_ZOOM = 4;
 
 export function Furniture2DEditor({
   plan,
+  dimensions,
   components,
-  referenceImageUrls,
+  referenceImages,
   busy,
   reviewMode,
   onPreview,
   onPersist,
   onAdd,
   onDelete,
+  onCalibrate,
   onReview,
   onFinish,
 }: Props) {
@@ -48,8 +52,7 @@ export function Furniture2DEditor({
   const [gridVisible, setGridVisible] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [photoVisible, setPhotoVisible] = useState(reviewMode);
-  const [referenceByView, setReferenceByView] = useState(() => initialReferenceByView(referenceImageUrls));
-  const [mirroredReferences, setMirroredReferences] = useState<Partial<Record<ImageView, boolean>>>({});
+  const [referenceByView, setReferenceByView] = useState(() => initialReferenceByView(referenceImages));
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [, setHistoryVersion] = useState(0);
@@ -57,10 +60,9 @@ export function Furniture2DEditor({
   const locked = !canMutatePlan(plan.status);
   const warnings = semanticWarnings(plan.furniture_type, components);
   const selected = components.find((component) => component.id === selectedId) ?? null;
-  const referenceOptions = referenceOptionsForView(view, referenceImageUrls);
+  const referenceOptions = referenceOptionsForView(view, referenceImages);
   const referenceView = referenceByView[view];
-  const referenceImageUrl = referenceView ? referenceImageUrls[referenceView] : undefined;
-  const referenceMirrored = referenceView ? Boolean(mirroredReferences[referenceView]) : false;
+  const referenceImage = referenceView ? referenceImages[referenceView] : undefined;
 
   function refreshHistoryState() {
     setHistoryVersion((version) => version + 1);
@@ -87,14 +89,6 @@ export function Furniture2DEditor({
   function setReferenceView(next: ImageView) {
     setReferenceByView((current) => ({ ...current, [view]: next }));
     setPhotoVisible(true);
-  }
-
-  function toggleReferenceMirror() {
-    if (!referenceView) return;
-    setMirroredReferences((current) => ({
-      ...current,
-      [referenceView]: !current[referenceView],
-    }));
   }
 
   async function commit(before: PlanComponent, after: PlanComponent) {
@@ -187,7 +181,7 @@ export function Furniture2DEditor({
         gridVisible={gridVisible}
         snapEnabled={snapEnabled}
         photoVisible={photoVisible}
-        hasPhoto={Boolean(referenceImageUrl)}
+        hasPhoto={Boolean(referenceImage)}
         locked={locked}
         reviewMode={reviewMode}
         busy={Boolean(busy)}
@@ -219,14 +213,14 @@ export function Furniture2DEditor({
         />
         <CanvasWorkspace
           components={components}
+          dimensions={dimensions}
           selectedId={selectedId}
           view={view}
           locked={locked}
           gridVisible={gridVisible}
           snapEnabled={snapEnabled}
-          referenceImageUrl={referenceImageUrl}
+          referenceImage={referenceImage}
           referenceView={referenceView}
-          referenceMirrored={referenceMirrored}
           referenceOptions={referenceOptions}
           photoVisible={photoVisible}
           zoom={zoom}
@@ -234,7 +228,7 @@ export function Furniture2DEditor({
           onPan={setPan}
           onZoom={(direction) => setZoom((value) => direction > 0 ? Math.min(MAX_ZOOM, value * 1.12) : Math.max(MIN_ZOOM, value / 1.12))}
           onReference={setReferenceView}
-          onMirror={toggleReferenceMirror}
+          onCalibration={(payload) => referenceView ? onCalibrate(referenceView, payload) : Promise.resolve(false)}
           onSelect={setSelectedId}
           onPreview={onPreview}
           onCommit={(before, after) => void commit(before, after)}

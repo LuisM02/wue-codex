@@ -123,6 +123,73 @@ def test_duplicate_view_conflicts_until_existing_image_is_deleted(
     assert upload_image(db_client, furniture_id, "front", data).status_code == 201
 
 
+def test_updates_and_validates_persistent_photo_calibration(
+    db_client: TestClient,
+    image_bytes_factory: Callable[..., bytes],
+) -> None:
+    _, furniture_id = create_furniture(db_client)
+    uploaded = upload_image(
+        db_client,
+        furniture_id,
+        "left",
+        image_bytes_factory("PNG"),
+    )
+    assert uploaded.status_code == 201
+    assert {key: uploaded.json()[key] for key in (
+        "object_left_ratio", "object_top_ratio", "object_width_ratio",
+        "object_height_ratio", "is_mirrored",
+    )} == {
+        "object_left_ratio": "0.000000",
+        "object_top_ratio": "0.000000",
+        "object_width_ratio": "1.000000",
+        "object_height_ratio": "1.000000",
+        "is_mirrored": False,
+    }
+
+    payload = {
+        "object_left_ratio": "0.125000",
+        "object_top_ratio": "0.100000",
+        "object_width_ratio": "0.750000",
+        "object_height_ratio": "0.800000",
+        "is_mirrored": True,
+    }
+    response = db_client.put(
+        f"/api/v1/furniture/{furniture_id}/images/left/calibration",
+        json=payload,
+    )
+    assert response.status_code == 200
+    assert {key: response.json()[key] for key in payload} == payload
+
+    persisted = db_client.get(
+        f"/api/v1/furniture/{furniture_id}/images/left"
+    )
+    assert {key: persisted.json()[key] for key in payload} == payload
+
+    invalid = db_client.put(
+        f"/api/v1/furniture/{furniture_id}/images/left/calibration",
+        json={**payload, "object_left_ratio": "0.500000", "object_width_ratio": "0.750000"},
+    )
+    assert invalid.status_code == 422
+
+
+def test_calibration_requires_an_existing_furniture_image(
+    db_client: TestClient,
+) -> None:
+    _, furniture_id = create_furniture(db_client)
+    response = db_client.put(
+        f"/api/v1/furniture/{furniture_id}/images/top/calibration",
+        json={
+            "object_left_ratio": 0,
+            "object_top_ratio": 0,
+            "object_width_ratio": 1,
+            "object_height_ratio": 1,
+            "is_mirrored": False,
+        },
+    )
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Furniture image not found"}
+
+
 @pytest.mark.parametrize(
     ("data", "content_type", "expected_status"),
     [

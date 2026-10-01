@@ -1,14 +1,17 @@
 """Furniture image metadata ORM model."""
 
+from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     Enum as SAEnum,
     ForeignKey,
     Integer,
+    Numeric,
     String,
     UniqueConstraint,
     Uuid,
@@ -54,6 +57,30 @@ class FurnitureImage(TimestampMixin, Base):
             "pixel_width > 0 AND pixel_height > 0",
             name="pixel_dimensions_positive",
         ),
+        CheckConstraint(
+            "object_left_ratio >= 0 AND object_left_ratio < 1",
+            name="object_left_ratio_range",
+        ),
+        CheckConstraint(
+            "object_top_ratio >= 0 AND object_top_ratio < 1",
+            name="object_top_ratio_range",
+        ),
+        CheckConstraint(
+            "object_width_ratio > 0 AND object_width_ratio <= 1",
+            name="object_width_ratio_range",
+        ),
+        CheckConstraint(
+            "object_height_ratio > 0 AND object_height_ratio <= 1",
+            name="object_height_ratio_range",
+        ),
+        CheckConstraint(
+            "object_left_ratio + object_width_ratio <= 1",
+            name="object_horizontal_crop_inside_image",
+        ),
+        CheckConstraint(
+            "object_top_ratio + object_height_ratio <= 1",
+            name="object_vertical_crop_inside_image",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
@@ -93,5 +120,20 @@ class FurnitureImage(TimestampMixin, Base):
     checksum_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     pixel_width: Mapped[int] = mapped_column(Integer, nullable=False)
     pixel_height: Mapped[int] = mapped_column(Integer, nullable=False)
+    object_left_ratio: Mapped[Decimal] = mapped_column(
+        Numeric(7, 6), nullable=False, default=Decimal("0"), server_default="0"
+    )
+    object_top_ratio: Mapped[Decimal] = mapped_column(
+        Numeric(7, 6), nullable=False, default=Decimal("0"), server_default="0"
+    )
+    object_width_ratio: Mapped[Decimal] = mapped_column(
+        Numeric(7, 6), nullable=False, default=Decimal("1"), server_default="1"
+    )
+    object_height_ratio: Mapped[Decimal] = mapped_column(
+        Numeric(7, 6), nullable=False, default=Decimal("1"), server_default="1"
+    )
+    is_mirrored: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
 
     furniture: Mapped["Furniture"] = relationship(back_populates="images")

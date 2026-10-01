@@ -22,7 +22,10 @@ from app.core.enums import FurnitureImageView, ImageInputSource
 from app.db.session import get_db_session
 from app.models.furniture import Furniture
 from app.models.furniture_image import FurnitureImage
-from app.schemas.furniture_image import FurnitureImageRead
+from app.schemas.furniture_image import (
+    FurnitureImageCalibrationUpdate,
+    FurnitureImageRead,
+)
 from app.services import furniture as furniture_service
 from app.services import furniture_images as image_service
 from app.services.image_storage import (
@@ -142,6 +145,25 @@ def get_furniture_image(
     session: SessionDependency,
 ) -> FurnitureImageRead:
     return require_image(session, furniture_id, view)
+
+
+@router.put("/{view}/calibration", response_model=FurnitureImageRead)
+def update_furniture_image_calibration(
+    furniture_id: UUID,
+    view: FurnitureImageView,
+    payload: FurnitureImageCalibrationUpdate,
+    session: SessionDependency,
+) -> FurnitureImageRead:
+    image = require_image(session, furniture_id, view)
+    return image_service.update_furniture_image_calibration(
+        session,
+        image,
+        object_left_ratio=payload.object_left_ratio,
+        object_top_ratio=payload.object_top_ratio,
+        object_width_ratio=payload.object_width_ratio,
+        object_height_ratio=payload.object_height_ratio,
+        is_mirrored=payload.is_mirrored,
+    )
 
 
 @router.get("/{view}/content", response_class=Response)

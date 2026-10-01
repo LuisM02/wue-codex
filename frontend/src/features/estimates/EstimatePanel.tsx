@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { BusyLabel, Notice, SectionHeading } from "../../components/Feedback";
-import { isWoodScrewMaterial } from "../../lib/catalog";
+import { isDemoCatalogName, isWoodScrewMaterial } from "../../lib/catalog";
 import { formatDate, formatNumber, unitLabel } from "../../lib/format";
 import { api } from "../../services/apiClient";
 import type {
@@ -128,6 +128,8 @@ export function EstimatePanel({ furniture, plan, initialSelection }: Props) {
   }
 
   const catalogReady = woods.length > 0 && hardware.length > 0 && laborRates.length > 0;
+  const usesDemoPrices = isDemoCatalogName(woods.find((item) => item.id === woodId)?.material_name)
+    || isDemoCatalogName(laborRates.find((item) => item.id === laborRateId)?.rate_name);
 
   return (
     <section className="workspace-section workspace-section--wide estimate-workspace">
@@ -138,6 +140,7 @@ export function EstimatePanel({ furniture, plan, initialSelection }: Props) {
         Select costing resources independently of the 3D finish. WUE uses each item’s latest dated price and preserves it when you create a quotation.
       </p>
       {error && <Notice tone="danger">{error}</Notice>}
+      {usesDemoPrices && <Notice tone="warning">Demonstration estimate using sample catalog prices. Replace them with supplier and workshop prices before quoting real work.</Notice>}
       {!catalogReady && busy !== "load" && (
         <Notice tone="warning">
           The pricing catalog needs at least one active wood material, an active hardware item named “Wood screw,” and one labor rate—with dated prices—before a complete estimate can be calculated.
@@ -196,6 +199,9 @@ export function EstimatePanel({ furniture, plan, initialSelection }: Props) {
             {busy === "calculate" || busy === "load" ? <BusyLabel>Calculating…</BusyLabel> : "Calculate complete cost"}
           </button>
           <p className="form-footnote">No overhead, markup, tax, or currency is added. The total is the exact sum of material, hardware, and labor.</p>
+          {plan.furniture_type === "dining_table" && plan.components.some((part) => part.component_name.endsWith("_apron")) && (
+            <p className="form-footnote">Prototype labor covers base assembly, legs, and tabletop. Separate apron work and apron fasteners are not itemized in the current rules.</p>
+          )}
         </div>
 
         <div className={`estimate-result${estimate ? " has-result" : ""}`}>
@@ -254,7 +260,7 @@ export function EstimatePanel({ furniture, plan, initialSelection }: Props) {
                   <div><dt>{quote.hardware_material_name}</dt><dd>{formatNumber(quote.hardware_cost)}</dd></div>
                   <div><dt>{quote.labor_rate_name}</dt><dd>{formatNumber(quote.labor_cost)}</dd></div>
                 </dl>
-                <footer>Price snapshot locked at creation</footer>
+                <footer>{isDemoCatalogName(quote.wood_material_name) || isDemoCatalogName(quote.labor_rate_name) ? "Demonstration prices · " : ""}Price snapshot locked at creation</footer>
               </article>
             ))}
           </div>

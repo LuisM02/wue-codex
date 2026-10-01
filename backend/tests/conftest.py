@@ -18,13 +18,32 @@ from sqlalchemy import Engine, create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from app.core.config import Settings
-from app.api.dependencies import get_image_storage
+from app.core.config import Settings, get_settings
+from app.api.dependencies import (
+    get_furniture_classifier,
+    get_furniture_reconstructor,
+    get_image_storage,
+)
 from app.db.session import get_db_session
 from app.main import app
 from app.services.image_storage import LocalImageStorage
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture(autouse=True)
+def isolated_ai_configuration(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+    """Tests must not invoke a live worker selected by the developer's .env."""
+    monkeypatch.setenv("WUE_CLASSIFICATION_PROVIDER", "unconfigured")
+    monkeypatch.setenv("WUE_RECONSTRUCTION_PROVIDER", "unconfigured")
+    cached_dependencies = (get_settings, get_furniture_classifier, get_furniture_reconstructor)
+    for dependency in cached_dependencies:
+        dependency.cache_clear()
+    try:
+        yield
+    finally:
+        for dependency in cached_dependencies:
+            dependency.cache_clear()
 
 
 @pytest.fixture

@@ -3,15 +3,18 @@ import { useEffect, useState } from "react";
 import { BusyLabel, EmptyState, Notice, SectionHeading } from "../../components/Feedback";
 import { furnitureLabel } from "../../lib/format";
 import { api } from "../../services/apiClient";
-import type { Furniture, FurniturePlan, PlanComponent, PlanComponentPayload } from "../../types/api";
+import type { Furniture, FurnitureDimensions, FurnitureImage, FurnitureImageCalibrationPayload, FurniturePlan, FurnitureReconstruction, ImageView, PlanComponent, PlanComponentPayload } from "../../types/api";
+import { ReconstructionFeedback } from "./ReconstructionFeedback";
 import { Furniture2DEditor } from "./cad/Furniture2DEditor";
 import { nextShelfName } from "./cad/editorGeometry";
-import type { ReferenceImageUrls } from "./cad/referencePhotos";
+import type { ReferenceImages } from "./cad/referencePhotos";
 
 interface Props {
   furniture: Furniture;
+  dimensions: FurnitureDimensions | null;
   plan: FurniturePlan | null;
-  referenceImageUrls: ReferenceImageUrls;
+  referenceImages: ReferenceImages;
+  onImageUpdated: (image: FurnitureImage) => void;
   onPlan: (plan: FurniturePlan) => void;
   onContinue: () => void;
 }
@@ -75,10 +78,11 @@ function addedPartPayload(plan: FurniturePlan, components: PlanComponent[]): Pla
   };
 }
 
-export function PlanEditor({ furniture, plan, referenceImageUrls, onPlan, onContinue }: Props) {
+export function PlanEditor({ furniture, dimensions, plan, referenceImages, onImageUpdated, onPlan, onContinue }: Props) {
   const [components, setComponents] = useState<PlanComponent[]>(plan?.components ?? []);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<FurnitureReconstruction | null>(null);
   const isPhotoDerived = Boolean(plan?.source_reconstruction_id);
   const reviewRequired = Boolean(
     plan?.status === "draft" && isPhotoDerived && !plan.parts_reviewed_at,
@@ -88,11 +92,24 @@ export function PlanEditor({ furniture, plan, referenceImageUrls, onPlan, onCont
     setComponents(plan?.components ?? []);
   }, [plan?.id, plan?.status]);
 
+  useEffect(() => {
+    let active = true;
+    setAnalysis(null);
+    if (plan?.source_reconstruction_id) {
+      void api.reconstruction.get(furniture.id).then((result) => {
+        if (active) setAnalysis(result);
+      }).catch(() => {
+        // Notes are supplementary; an existing saved plan remains editable.
+      });
+    }
+    return () => { active = false; };
+  }, [furniture.id, plan?.id, plan?.source_reconstruction_id]);
+
   async function generate() {
     setBusy("generate");
     setError(null);
     try {
-      await api.reconstruction.run(furniture.id);
+      setAnalysis(await api.reconstruction.run(furniture.id));
       onPlan(await api.plans.generate(furniture.id));
     } catch (reason) {
       setError((reason as Error).message);
@@ -198,6 +215,20 @@ export function PlanEditor({ furniture, plan, referenceImageUrls, onPlan, onCont
     }
   }
 
+  async function calibrateReference(view: ImageView, payload: FurnitureImageCalibrationPayload): Promise<boolean> {
+    setBusy(`calibration:${view}`);
+    setError(null);
+    try {
+      onImageUpdated(await api.images.calibrate(furniture.id, view, payload));
+      return true;
+    } catch (reason) {
+      setError((reason as Error).message);
+      return false;
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function revise() {
     if (!plan) return;
     setBusy("revise");
@@ -216,7 +247,7 @@ export function PlanEditor({ furniture, plan, referenceImageUrls, onPlan, onCont
     setBusy("rebuild");
     setError(null);
     try {
-      await api.reconstruction.run(furniture.id);
+      setAnalysis(await api.reconstruction.run(furniture.id));
       onPlan(await api.plans.rebuildFromPhotos(plan.id));
     } catch (reason) {
       setError((reason as Error).message);
@@ -238,6 +269,7 @@ export function PlanEditor({ furniture, plan, referenceImageUrls, onPlan, onCont
           : `WUE uses canonical X/Y/Z component geometry. Edit the reconstructed ${plan ? furnitureLabel(plan.furniture_type).toLowerCase() : "furniture"} in Front, Side, and Top views, then finish the revision to lock it for 3D and costing.`}
       </p>
       {error && <Notice tone="danger">{error}</Notice>}
+      {analysis && <ReconstructionFeedback analysis={analysis} dimensions={dimensions} plan={plan} />}
       {reviewRequired && (
         <Notice tone="warning">
           <strong>Review the AI-detected parts before finalizing.</strong>{" "}
@@ -259,14 +291,16 @@ export function PlanEditor({ furniture, plan, referenceImageUrls, onPlan, onCont
         <>
           <Furniture2DEditor
             plan={plan}
+            dimensions={dimensions}
             components={components}
-            referenceImageUrls={referenceImageUrls}
+            referenceImages={referenceImages}
             busy={busy}
             reviewMode={reviewRequired}
             onPreview={replaceComponent}
             onPersist={persistComponent}
             onAdd={addComponent}
             onDelete={deleteComponent}
+            onCalibrate={calibrateReference}
             onReview={() => void reviewParts()}
             onFinish={() => void finalize()}
           />

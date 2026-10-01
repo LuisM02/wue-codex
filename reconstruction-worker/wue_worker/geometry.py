@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from statistics import median
 
 from .imaging import AnalyzedView
 from .schemas import PartProposal, ProfilePoint, ReconstructionResponse
@@ -416,39 +417,104 @@ def _chair_rail_region(
     )
 
 
+def _chair_apron_band(
+    view: AnalyzedView, seat_center: int, band_bottom: int
+) -> tuple[int, int] | None:
+    """Find a sustained narrower band after the seat's widest lip.
+
+    Follow the observed dense seat band beyond a truncated search window.
+    Sloped/rounded seat edges are not enough evidence, and a leg-only row
+    must end the search before a separate lower stretcher is reached.
+    """
+    rows = view.rows()
+    peak = max(rows[max(0, seat_center - 3):seat_center + 4], default=0)
+    tolerance = 1.5 / view.object_width
+    minimum_rows = max(4, round(view.object_height * 0.025))
+    start = None
+    stop = seat_center
+    density_at_start = 0.0
+    search_stop = min(len(rows), max(band_bottom + 1, round(len(rows) * 0.72)))
+    for row in range(seat_center, search_stop):
+        density = rows[row]
+        if density < max(0.52, peak * 0.65):
+            break
+        if density >= peak - tolerance:
+            start = None
+            continue
+        if start is None or abs(density - density_at_start) > tolerance:
+            if start is not None and stop - start >= minimum_rows:
+                return start, stop
+            start, density_at_start = row, density
+        stop = row + 1
+    if start is None or stop - start < minimum_rows:
+        return None
+    return start, stop
+
+
+def _row_depth_estimate(
+    side: AnalyzedView, start_y: int, stop_y: int, overall_depth: float
+) -> tuple[float, float]:
+    """Estimate local cross-section from row spans, not the swept envelope.
+
+    A leaning post must not inherit the width of its entire travel through Z.
+    The median location is still a straight extrusion approximation; neither
+    camera pose nor hidden member thickness can be established by this method.
+    """
+    left, top, _, _ = side.bbox
+    samples = []
+    for row in range(max(0, start_y), min(side.object_height, stop_y)):
+        offset = (top + row) * side.width + left
+        spans = _spans(
+            list(side.mask[offset:offset + side.object_width]),
+            0.5, gap=0, minimum=2,
+        )
+        if spans:
+            samples.append(max(spans, key=lambda span: span[1] - span[0]))
+    if len(samples) < 3:
+        return _depth_geometry(side, start_y, stop_y, overall_depth)
+    thickness = median(stop - start for start, stop in samples)
+    center = median((start + stop) / 2 for start, stop in samples)
+    return (
+        _rounded(thickness / side.object_width * overall_depth),
+        _rounded((center - thickness / 2) / side.object_width * overall_depth),
+    )
+
+
 def _chair(
     views: dict[str, AnalyzedView], width: float, height: float, depth: float
 ) -> tuple[list[PartProposal], list[str]]:
-    front, side = views["front"], views["left"]
+    # In a conventional right elevation the chair's front is on the left,
+    # matching increasing canonical Z from front to back. A left elevation
+    # would reverse rear/backrest placement unless explicitly mirrored.
+    front, side = views["front"], views["right"]
     seat_top, seat_bottom, seat_center = _dominant_band(
         front,
         round(front.object_height * 0.28),
         round(front.object_height * 0.64),
         minimum_density=0.52,
     )
-    side_center = round(seat_center / front.object_height * side.object_height)
-    side_half_band = max(
-        2,
-        round(
-            (seat_bottom - seat_top)
-            / front.object_height
-            * side.object_height
-        ),
+    front_apron_band = _chair_apron_band(front, seat_center, seat_bottom)
+    seat_underside = front_apron_band[0] if front_apron_band else seat_bottom
+    side_seat_top, side_band_bottom, side_center = _dominant_band(
+        side, round(side.object_height * 0.28),
+        round(side.object_height * 0.64), minimum_density=0.52,
     )
+    side_apron_band = _chair_apron_band(side, side_center, side_band_bottom)
+    side_underside = side_apron_band[0] if side_apron_band else side_band_bottom
     seat = trace_region(
         front,
         0,
         seat_top,
         front.object_width,
-        seat_bottom,
+        seat_underside,
         width,
         height,
         primary_span_only=True,
     )
     seat_depth, seat_z = _depth_geometry(
         side,
-        max(0, side_center - side_half_band),
-        min(side.object_height, side_center + side_half_band),
+        side_seat_top,
+        side_underside,
         depth,
     )
     parts = [
@@ -481,7 +547,7 @@ def _chair(
         height,
         primary_span_only=True,
     )
-    back_depth, back_z = _depth_geometry(
+    back_depth, back_z = _row_depth_estimate(
         side,
         round(back_top / front.object_height * side.object_height),
         max(
@@ -504,21 +570,25 @@ def _chair(
     )
 
     order = 2
+    post_depth, post_z = _row_depth_estimate(
+        side,
+        round(back_bottom / front.object_height * side.object_height),
+        round(seat_top / front.object_height * side.object_height),
+        depth,
+    )
     post_spans = _spans(
         front.columns(back_bottom, seat_top),
         0.42,
         gap=max(1, front.object_width // 100),
         minimum=max(2, front.object_width // 100),
     )
-    if len(post_spans) > 2:
-        post_spans = sorted(
-            post_spans,
-            key=lambda span: span[1] - span[0],
-            reverse=True,
-        )[:2]
-        post_spans.sort()
-    if len(post_spans) == 2:
-        for label, span in zip(("left", "right"), post_spans, strict=True):
+    if len(post_spans) >= 2:
+        for index, span in enumerate(post_spans):
+            name = (
+                "left_backrest_post" if index == 0
+                else "right_backrest_post" if index == len(post_spans) - 1
+                else f"backrest_slat_{index}"
+            )
             post = trace_region(
                 front,
                 span[0],
@@ -530,11 +600,11 @@ def _chair(
             )
             parts.append(
                 _proposal(
-                    f"{label}_backrest_post",
+                    name,
                     "panel",
                     post,
-                    back_depth,
-                    back_z,
+                    post_depth,
+                    post_z,
                     order,
                     0.55,
                     ["front", "back", "left", "right"],
@@ -542,11 +612,8 @@ def _chair(
             )
             order += 1
 
-    front_spans = _chair_leg_regions(front, seat_bottom)
-    side_start = min(
-        side.object_height - 1,
-        round(seat_bottom / front.object_height * side.object_height),
-    )
+    front_spans = _chair_leg_regions(front, seat_underside)
+    side_start = min(side.object_height - 1, side_underside)
     depth_spans = _chair_leg_regions(side, side_start)
     front_labels = ["left", "right"] if len(front_spans) == 2 else ["center"]
     depth_labels = ["front", "rear"] if len(depth_spans) == 2 else ["center"]
@@ -555,7 +622,7 @@ def _chair(
             region = trace_region(
                 front,
                 front_span[0],
-                seat_bottom,
+                seat_underside,
                 front_span[1],
                 front.object_height,
                 width,
@@ -588,6 +655,64 @@ def _chair(
                 )
             )
             order += 1
+
+    # Each photographed elevation must provide its own apron evidence. A
+    # right-side band supports a provisional symmetric pair, not a hidden
+    # joinery claim. Aprons stop between legs rather than filling the seat.
+    if len(depth_spans) == 2:
+        for label, elevation, span in (
+            ("front", front, depth_spans[0]),
+            ("rear", views["back"], depth_spans[1]),
+        ):
+            if label == "front":
+                band, leg_spans = front_apron_band, front_spans
+            else:
+                _, bottom, center = _dominant_band(
+                    elevation, round(elevation.object_height * 0.28),
+                    round(elevation.object_height * 0.64), minimum_density=0.52,
+                )
+                band = _chair_apron_band(elevation, center, bottom)
+                leg_spans = _chair_leg_regions(elevation, bottom)
+            if band is None or len(leg_spans) != 2 or leg_spans[1][0] <= leg_spans[0][1]:
+                continue
+            apron = trace_region(
+                elevation, leg_spans[0][1], band[0], leg_spans[1][0],
+                band[1], width, height,
+            )
+            if label == "rear":
+                apron = TracedRegion(
+                    width=apron.width, height=apron.height,
+                    x=_rounded(width - apron.x - apron.width), y=apron.y,
+                    points=[
+                        ProfilePoint(u=_rounded(apron.width - point.u), v=point.v)
+                        for point in reversed(apron.points)
+                    ],
+                )
+            parts.append(_proposal(
+                f"{label}_apron", "panel", apron,
+                (span[1] - span[0]) / side.object_width * depth,
+                span[0] / side.object_width * depth, order, 0.48,
+                [label if label == "front" else "back", "right"],
+            ))
+            order += 1
+    if side_apron_band is not None and len(front_spans) == len(depth_spans) == 2:
+        inner_start, inner_stop = depth_spans[0][1], depth_spans[1][0]
+        if inner_stop > inner_start:
+            side_apron = trace_region(
+                side, inner_start, side_apron_band[0], inner_stop,
+                side_apron_band[1], depth, height,
+            )
+            for label, span in zip(("left", "right"), front_spans, strict=True):
+                apron = _rectangle_region(
+                    (span[1] - span[0]) / front.object_width * width,
+                    side_apron.height, span[0] / front.object_width * width,
+                    side_apron.y,
+                )
+                parts.append(_proposal(
+                    f"{label}_apron", "panel", apron, side_apron.width,
+                    side_apron.x, order, 0.46, ["right", "front"],
+                ))
+                order += 1
 
     front_rail = _chair_rail_region(
         front,
@@ -646,10 +771,48 @@ def _chair(
             order += 1
     warnings = [
         "Hidden joinery and occluded rear surfaces are inferred; verify them in the part editor",
+        "Chair front/back placement uses the right-side photograph; mirror the left reference overlay when comparing the Side view",
+        "Backrest/slat depths use median side-view row spans at each height, not verified timber thicknesses; lean and curvature are still approximated by straight extrusions",
+        "Seat thickness remains a perspective-projected band; visible apron bands are separated but flush or hidden aprons may require manual correction",
+        "Paired side aprons and occluded member thicknesses assume symmetry; verify against both side photographs",
         "Seat, backrest, posts, legs, and visible stretchers are separated from the photographed silhouette; confirm overlapping rails before manufacture",
         "Front/back and left/right labels assume the photographs were placed in the requested slots",
     ]
     return parts, warnings
+
+
+def _table_apron_band(view: AnalyzedView, start: int) -> tuple[int, int] | None:
+    """Require a stable narrower band beneath the slab, not its curved edge.
+
+    The slab search is deliberately capped because perspective exaggerates
+    its thickness. Its unconsumed rows must not become invented apron panels.
+    A small overhang is sufficient; require several stable rows so rounded
+    slab corners alone do not create an apron. Fully flush/hidden bands remain
+    uncertain rather than being fabricated.
+    """
+    rows = view.rows()
+    search_stop = round(view.object_height * 0.4)
+    peak = max(rows[:search_stop], default=1.0)
+    pixel_tolerance = 1.5 / view.object_width
+    minimum_rows = max(4, round(view.object_height * 0.03))
+    band_start = None
+    band_stop = start
+    band_density = 0.0
+    for row, density in enumerate(rows[start:search_stop], start):
+        if density < 0.55:
+            break
+        if density > peak - pixel_tolerance:
+            band_start = None
+            continue
+        if band_start is None or abs(density - band_density) > pixel_tolerance:
+            if band_start is not None and band_stop - band_start >= minimum_rows:
+                return band_start, band_stop
+            band_start = row
+            band_density = density
+        band_stop = row + 1
+    if band_start is None or band_stop - band_start < minimum_rows:
+        return None
+    return band_start, band_stop
 
 
 def _dining_table(
@@ -657,8 +820,36 @@ def _dining_table(
 ) -> tuple[list[PartProposal], list[str]]:
     front, side = views["front"], views["left"]
     top_start, top_stop, _ = _strongest_band(front, 0.02, 0.42)
-    tabletop = trace_region(
-        front, 0, top_start, front.object_width, top_stop, width, height
+    tabletop_projection = trace_region(
+        front, 0, 0, front.object_width, top_stop, width, height
+    )
+    # The photographed top surface is foreshortened into the front elevation.
+    # Its projected height is not a trustworthy physical slab thickness.
+    top_thickness = min(tabletop_projection.height, height * 0.065)
+    underside_height = height - top_thickness
+    vertical_scale = (
+        front.object_height / max(1, front.object_height - top_stop)
+        * underside_height / height
+    )
+
+    def remap_vertical(
+        region: TracedRegion, scale: float, *, y: float | None = None
+    ) -> TracedRegion:
+        return TracedRegion(
+            width=region.width,
+            height=_rounded(region.height * scale),
+            x=region.x,
+            y=_rounded(region.y * scale if y is None else y),
+            points=[
+                ProfilePoint(u=point.u, v=_rounded(point.v * scale))
+                for point in region.points
+            ],
+        )
+
+    tabletop = remap_vertical(
+        tabletop_projection,
+        top_thickness / tabletop_projection.height,
+        y=underside_height,
     )
     side_top_start = round(
         top_start / front.object_height * side.object_height
@@ -682,25 +873,30 @@ def _dining_table(
             ["front", "back", "left", "right", "top"],
         )
     ]
-    front_spans = _leg_regions(front, top_stop)
+    # Sample below the apron: averaging the entire underside joins otherwise
+    # distinct legs into one wide support on photographed dining tables.
+    front_spans = _chair_leg_regions(front, top_stop)
     side_start = min(
         side.object_height - 1,
         round(top_stop / front.object_height * side.object_height),
     )
-    depth_spans = _leg_regions(side, side_start)
+    depth_spans = _chair_leg_regions(side, side_start)
     order = 1
     x_labels = ["left", "right"] if len(front_spans) == 2 else ["center"]
     z_labels = ["front", "rear"] if len(depth_spans) == 2 else ["center"]
     for z_index, z_span in enumerate(depth_spans):
         for x_index, x_span in enumerate(front_spans):
-            region = trace_region(
-                front,
-                x_span[0],
-                top_stop,
-                x_span[1],
-                front.object_height,
-                width,
-                height,
+            region = remap_vertical(
+                trace_region(
+                    front,
+                    x_span[0],
+                    top_stop,
+                    x_span[1],
+                    front.object_height,
+                    width,
+                    height,
+                ),
+                vertical_scale,
             )
             if len(front_spans) == 2 and len(depth_spans) == 2:
                 name = f"{z_labels[z_index]}_{x_labels[x_index]}_leg"
@@ -719,8 +915,72 @@ def _dining_table(
                 )
             )
             order += 1
+    if len(front_spans) == 2 and len(depth_spans) == 2:
+        front_apron_band = _table_apron_band(front, top_stop)
+        if front_apron_band is not None:
+            apron_start, apron_stop = front_apron_band
+            apron = remap_vertical(
+                trace_region(
+                    front,
+                    front_spans[0][1],
+                    apron_start,
+                    front_spans[1][0],
+                    apron_stop,
+                    width,
+                    height,
+                ),
+                vertical_scale,
+            )
+            for label, span in zip(("front", "rear"), depth_spans, strict=True):
+                parts.append(
+                    _proposal(
+                        f"{label}_apron",
+                        "panel",
+                        apron,
+                        (span[1] - span[0]) / side.object_width * depth,
+                        span[0] / side.object_width * depth,
+                        order,
+                        0.52,
+                        ["front", "back", "left", "right"],
+                    )
+                )
+                order += 1
+        # Side evidence is independent: a table can have side aprons without
+        # front/rear ones, and their height need not match the front apron.
+        side_apron_band = _table_apron_band(side, side_start)
+        inner_depth_start = depth_spans[0][1]
+        inner_depth_stop = depth_spans[1][0]
+        if side_apron_band is not None and inner_depth_stop > inner_depth_start:
+            side_vertical_scale = (
+                side.object_height / max(1, side.object_height - side_start)
+                * underside_height / height
+            )
+            side_region = remap_vertical(
+                trace_region(
+                    side, inner_depth_start, side_apron_band[0],
+                    inner_depth_stop, side_apron_band[1], depth, height,
+                ),
+                side_vertical_scale,
+            )
+            for label, span in zip(("left", "right"), front_spans, strict=True):
+                side_apron = _rectangle_region(
+                    (span[1] - span[0]) / front.object_width * width,
+                    side_region.height,
+                    span[0] / front.object_width * width,
+                    side_region.y,
+                )
+                parts.append(
+                    _proposal(
+                        f"{label}_apron", "panel", side_apron,
+                        side_region.width, side_region.x, order, 0.48,
+                        ["left", "right", "front", "back"],
+                    )
+                )
+                order += 1
     return parts, [
         "Hidden joinery and the tabletop underside are inferred; verify them in the part editor",
+        "Tabletop thickness is estimated because camera perspective makes its front-view height unreliable",
+        "Apron depth and rear-leg placement are estimated from opposite views; correct them against the photographs",
         "Front/back and left/right labels assume the photographs were placed in the requested slots",
     ]
 
@@ -876,6 +1136,18 @@ def reconstruct(
         "bookshelf": _bookshelf,
     }
     parts, warnings = builders[furniture_type](views, width, height, depth)
+    photographed_aspect = views["front"].object_width / views["front"].object_height
+    supplied_aspect = width / height
+    aspect_conflict = max(
+        photographed_aspect / supplied_aspect,
+        supplied_aspect / photographed_aspect,
+    )
+    if aspect_conflict > 2:
+        warnings.insert(
+            0,
+            "Supplied width and height strongly disagree with the front photo's "
+            "proportions; check the overall measurements before finalizing",
+        )
     quality = sum(
         min(1.0, view.dominance) for view in views.values()
     ) / len(views)
@@ -886,6 +1158,11 @@ def reconstruct(
         confidence=round(confidence, 3),
         warnings=[
             pipeline_warning,
+            *(
+                view.segmentation_warning
+                for view in views.values()
+                if view.segmentation_warning
+            ),
             *input_warnings,
             *warnings,
         ],

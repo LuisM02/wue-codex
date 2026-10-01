@@ -1,4 +1,5 @@
 import type { FurnitureType, PlanComponent, PlanStatus } from "../../../types/api";
+import { hasComponentRotation, projectedBox } from "../../../lib/componentPose";
 
 export type OrthographicView = "front" | "side" | "top";
 export type ResizeHandle = "north-west" | "north-east" | "south-west" | "south-east";
@@ -142,6 +143,7 @@ export function projectComponent(
   component: PlanComponent,
   view: OrthographicView,
 ): ProjectedComponent {
+  if (hasComponentRotation(component)) return projectedBox(component, view);
   const definition = VIEW_DEFINITIONS[view];
   const horizontalSize = sizeField(component, definition.horizontalSize);
   const verticalSize = sizeField(component, definition.verticalSize);
@@ -257,10 +259,11 @@ export function applyProjectedPosition(
   vertical: number,
 ): PlanComponent {
   const definition = VIEW_DEFINITIONS[view];
+  const projected = projectComponent(component, view);
   return {
     ...component,
-    [definition.horizontalPosition]: decimal(horizontal),
-    [definition.verticalPosition]: decimal(vertical),
+    [definition.horizontalPosition]: decimal(numeric(component[definition.horizontalPosition]) + horizontal - projected.horizontal),
+    [definition.verticalPosition]: decimal(numeric(component[definition.verticalPosition]) + vertical - projected.vertical),
   };
 }
 
@@ -273,6 +276,9 @@ export function resizeComponent(
   scale: number,
   gridSpacing: number | null,
 ): PlanComponent {
+  // A rotated projected envelope is not a local size. Use exact Properties
+  // until inverse-pose resizing is implemented instead of corrupting dimensions.
+  if (hasComponentRotation(component)) return component;
   const definition = VIEW_DEFINITIONS[view];
   const horizontalSize = sizeField(component, definition.horizontalSize);
   const verticalSize = sizeField(component, definition.verticalSize);
@@ -323,6 +329,7 @@ export function moveProfilePoint(
   scale: number,
   gridSpacing: number | null,
 ): PlanComponent {
+  if (hasComponentRotation(component)) return component;
   if (component.geometry_kind !== "extruded_profile" || !component.profile_points?.[pointIndex]) {
     return component;
   }

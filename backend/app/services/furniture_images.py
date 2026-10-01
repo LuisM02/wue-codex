@@ -1,6 +1,7 @@
 """Furniture image metadata and storage lifecycle operations."""
 
 import logging
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
@@ -83,6 +84,27 @@ def create_furniture_image(
         session.rollback()
         storage.delete(storage_key)
         raise
+    session.refresh(image)
+    return image
+
+
+def update_furniture_image_calibration(
+    session: Session,
+    image: FurnitureImage,
+    *,
+    object_left_ratio: Decimal,
+    object_top_ratio: Decimal,
+    object_width_ratio: Decimal,
+    object_height_ratio: Decimal,
+    is_mirrored: bool,
+) -> FurnitureImage:
+    """Persist display calibration without changing source-image AI inputs."""
+    image.object_left_ratio = object_left_ratio
+    image.object_top_ratio = object_top_ratio
+    image.object_width_ratio = object_width_ratio
+    image.object_height_ratio = object_height_ratio
+    image.is_mirrored = is_mirrored
+    commit(session)
     session.refresh(image)
     return image
 

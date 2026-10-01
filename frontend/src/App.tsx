@@ -19,9 +19,9 @@ import type {
   FurnitureDimensions,
   FurnitureImage,
   FurniturePlan,
-  ImageView,
   Project,
 } from "./types/api";
+import type { ReferenceImages } from "./features/plans/cad/referencePhotos";
 
 const FurnitureViewer = lazy(() =>
   import("./features/viewer/FurnitureViewer").then((module) => ({
@@ -98,10 +98,13 @@ export default function App() {
     plan,
     bomSelection,
   }), [project, furniture, images, dimensions, plan, bomSelection]);
-  const referenceImageUrls = useMemo<Partial<Record<ImageView, string>>>(() => {
+  const referenceImages = useMemo<ReferenceImages>(() => {
     if (!furniture) return {};
     return Object.fromEntries(
-      images.map((image) => [image.view, api.images.contentUrl(furniture.id, image.view)]),
+      images.map((image) => [image.view, {
+        image,
+        url: api.images.contentUrl(furniture.id, image.view),
+      }]),
     );
   }, [furniture, images]);
 
@@ -203,8 +206,10 @@ export default function App() {
         {step === "plan" && furniture && (
           <PlanEditor
             furniture={furniture}
+            dimensions={dimensions}
             plan={plan}
-            referenceImageUrls={referenceImageUrls}
+            referenceImages={referenceImages}
+            onImageUpdated={(updated) => setImages((items) => items.map((image) => image.id === updated.id ? updated : image))}
             onPlan={setPlan}
             onContinue={() => visit("model")}
           />

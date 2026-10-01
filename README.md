@@ -1,4 +1,7 @@
-# WUE Codex Edition
+# WUE Furniture Workshop
+
+Latest verified prototype checkpoint and remaining limits:
+[October 1, 2026 checkpoint](docs/PROTOTYPE_CHECKPOINT_2026-10-01.md).
 
 WUE (Wood U Estimate) is an AI-assisted system for reconstructing wooden furniture, estimating materials and labor, and producing quotations. This repository is a new, independent implementation and supports exactly three furniture types: `chair`, `dining_table`, and `bookshelf`.
 
@@ -75,9 +78,10 @@ Five-view image endpoints are:
 - `GET /api/v1/furniture/{furniture_id}/images` — metadata in front, back, left, right, top order
 - `GET /api/v1/furniture/{furniture_id}/images/{view}` — metadata for one view
 - `GET /api/v1/furniture/{furniture_id}/images/{view}/content` — validated encoded image bytes
+- `PUT /api/v1/furniture/{furniture_id}/images/{view}/calibration` — save the normalized furniture crop and horizontal mirror state used by the CAD overlay
 - `DELETE /api/v1/furniture/{furniture_id}/images/{view}` — remove metadata and stored bytes
 
-Each furniture item accepts at most one image per required view. JPEG, PNG, and WebP are verified from actual bytes rather than trusting filenames or MIME declarations. Deleting a project or furniture item also removes its stored image objects. Furniture starts with no assigned type; a successful classifier result or an explicit testing correction may assign only `chair`, `dining_table`, or `bookshelf`.
+Each furniture item accepts at most one image per required view. JPEG, PNG, and WebP are verified from actual bytes rather than trusting filenames or MIME declarations. Each saved view also owns a bounded, normalized object crop (`object_left_ratio`, `object_top_ratio`, `object_width_ratio`, `object_height_ratio`) and `is_mirrored` flag. The CAD editor uses that calibration to map the visible furniture onto the measured Front, Side, or Top bounds; calibration is review metadata and deliberately does not invalidate the unchanged source image's AI outputs. Deleting a project or furniture item also removes its stored image objects. Furniture starts with no assigned type; a successful classifier result or an explicit testing correction may assign only `chair`, `dining_table`, or `bookshelf`.
 
 Classification endpoints are:
 
@@ -182,6 +186,33 @@ The database named in `WUE_TEST_DATABASE_URL` is used only as a safe naming and 
 
 ## Frontend setup
 
+### Windows demo startup and recovery
+
+From the repository root, run:
+
+```powershell
+.\scripts\start-wue.ps1
+```
+
+This local-only launcher uses the existing Python/Node dependencies and WSL SAM
+installation. It starts missing services in hidden background processes, reuses
+healthy services, and uses worker8010/API8011/frontend5174 explicitly. It checks
+PostgreSQL health, the frontend API proxy, and the expected SAM 2.1 GPU provider.
+It never installs packages, migrates/resets databases, stops conflicting apps,
+or touches the unrelated app on port8000. If an occupied target port is unhealthy
+or belongs to another service, it stops with an explanation instead of replacing
+that process. Background logs are local under ignored `.wue-runtime/`.
+
+For a read-only readiness check use `scripts/start-wue.ps1 -CheckOnly`. Test its
+identification/port/hidden-process safeguards with
+`scripts/test-wue-runtime.ps1` (18 checks). The launcher was verified against the
+running demo and partial-startup conditions were mocked; a complete laptop-reboot
+test has not yet been performed. PostgreSQL must already be installed/running,
+and the existing database/migrations/model environment must already be prepared.
+Healthy processes are not automatically restarted when source code changes.
+If Windows blocks script execution, report the exact error rather than weakening
+system-wide execution-policy protections.
+
 Install and run the web interface in a second terminal after starting the API:
 
 ```powershell
@@ -203,6 +234,65 @@ npm audit --audit-level=moderate
 The Three.js viewer is loaded only when the preview step opens, keeping it out of the initial application bundle.
 
 ## Geometry and costing guardrails
+
+### October 1 chair-photo test checkpoint
+
+Later rotation-consistency checkpoint (newest frontend result): the CAD views
+now project the same center-pivot, Euler-XYZ posed solid used by the 3D viewer.
+Traced extrusions are centered before rendering, correcting their former
+corner pivot; zero-angle positions remain unchanged. Side/Top tilt direction,
+cross-axis dimension coupling, rotated Fit/selection bounds and edge snapping
+now follow the projected box. Rotated traced shapes retain their original
+outline rather than using a convex hull. Direct drag still moves rotated parts;
+canvas resize/outline handles are suppressed for them until inverse-pose editing
+is implemented. Use exact Properties for their local dimensions and angles.
+Displayed rotated annotations describe projected bounds, not stock dimensions.
+No saved finalized model or cost data was rewritten, and no automatic lean
+estimate was added. A temporary 8-degree draft slat test was undone and all saved
+values verified restored; the draft remains unreviewed. **57 frontend tests
+pass**, including actual Three.js extrusion/rotation parity, and build passes
+(existing lazy-viewer warning, ~852.86 kB). Worker30/backend348 remain the latest
+prior results, not rerun for this frontend-only change. New files:
+`frontend/src/lib/componentPose.ts`, `componentPose.test.ts`, and
+`frontend/src/features/viewer/profileGeometry.ts`.
+
+Later seat/apron checkpoint (current): `Slatted chair seat-apron test (approx.
+size)` has 18 proposed parts, separating front/rear and paired side aprons from
+the seat using sustained narrower silhouette bands. Front and back evidence are
+independent; side pairing is a stated symmetry assumption. Legs now trace up to
+the seat underside instead of stopping below the apron. The seat's projected
+height changed from 135.9375 to 77.3438 mm, not a verified physical thickness.
+Backrest/slat depth uses median local row spans instead of the swept envelope;
+the real set still yields 107.4561 mm rail and 100.8772 mm post/slat estimates
+because members overlap in the side photograph. Lean/curvature and hidden
+thickness are not solved. No rotation or new 3D representation was introduced.
+The new draft remains unreviewed. Front/Back/Left/Right object-bound reference
+crops were saved for this copy only (Back/Left mirrored); the angled Top remains
+uncalibrated. Earlier 14-part chair was finalized during user testing and is
+preserved; initial eight-part comparator stays draft. Table/quote unchanged.
+Latest worker result is **30 passing**, with two dependency deprecations. Existing
+frontend/build/backend results below remain the latest observed, not new runs in
+this worker-only change. Readiness and `git diff --check` pass. The new regression
+file is `reconstruction-worker/tests/test_chair_geometry.py`.
+
+- At the initial checkpoint, `Photo reconstruction tests` retained an eight-part draft and `Slatted chair improved proposal (approx. size)`, both unreviewed. The user approved approximate 450 × 900 × 500 mm dimensions. The later checkpoint above supersedes their current status; the retained table demo and quotation are unchanged.
+- The improved photo proposal has 14 parts: seat, top backrest rail, two outer backrest posts, six observed middle slats, and four legs. The fitter preserves observed slat columns instead of discarding all but the outer posts. A mask guard now rejects neural masks that expand onto floor/shadow even below the previous dense-fill threshold. Chair Z placement uses the right-side photograph; mirror a left-photo overlay for comparison.
+- This is not an accurate manufacturing reconstruction yet: the seat band includes apron pixels, backrest/slat depths are projected envelopes rather than measured timber thickness, and the supplied Top image is angled rather than truly overhead. Photo overlays still need crop calibration. No physical accuracy was measured.
+- Photo-analysis feedback checks component source-part identities as well as reconstruction identity. A rerun can replace part IDs under the same reconstruction ID; unmatched analysis now displays a separation notice instead of implying it describes the saved drawing. Manual added parts remain allowed.
+- `scripts/probe-photo-set.py` probes five local photos without saving by default. Supplying all three dimensions and explicit `--save-test-copy NAME` imports a separate draft into `Photo reconstruction tests`; it never reviews/finalizes it and rejects duplicate names. `scripts/probe-saved-furniture.py` remains a read-only saved-photo check.
+- Initial same-day verification: 43 frontend tests and 23 worker tests pass; production build passes. The later worker result above supersedes 23. Latest full backend result remains 348 passing (backend unchanged during these chair/provenance changes). Existing worker deprecations and large lazy 3D bundle warning remain. Startup readiness passes for worker8010/API8011/frontend5174. Changes remain uncommitted.
+
+### September 30 prototype demo checkpoint
+
+- The separate `Table prototype demo (approx. size)` uses approximate overall dimensions of 1800 × 750 × 900 mm. The original table record and its supplied dimensions were preserved. Approximate sizes demonstrate the workflow, not measured reconstruction accuracy.
+- Its reviewed, finalized revision contains nine parts: one tabletop, four legs, and four aprons. Two side aprons were added as explicit manual corrections to the seven-part photo proposal. Finalized geometry remains locked and is shared by 3D, material quantities, and quotation snapshots.
+- The editor displays saved photo-analysis notes and supplied dimensions. Strong photo/measurement proportion disagreements are visible warnings; uncertain thickness, depth, hidden joinery, and corrected masks remain review notes.
+- Sample catalog entries `DEMO wood - sample price` (100 per board foot), `Wood screw` (2 per piece), and `DEMO labor - sample price` (150 per hour), dated 2026-09-30, are illustrative values, not supplier prices. The BOM, estimate, and saved quote display demonstration-price labels when a DEMO-prefixed resource is selected. The screw identity must remain `Wood screw` for the current calculator.
+- The saved demo quotation totals 5,831.51 at display precision: material 5,335.51, screws 16, labor 480. Backend values retain Decimal precision. No currency, tax, markup, or overhead is inferred.
+- Dining-table hardware and labor remain the existing v1 assumptions: eight screws and 3.20 hours for this table. Separate apron joints/work, cutting waste, and stock layout are not itemized; the interface now explicitly states these limitations.
+- Subsequent table hardening distinguishes stable apron bands from leftover/rounded tabletop pixels. Regression cases cover tables without aprons, missing side-apron evidence, small overhangs, and changed leg spacing. A fresh direct SAM probe of the saved demo photos proposed all nine parts while leaving its finalized plan unchanged; the stored seven-part analysis and manually reviewed plan were not rewritten.
+- Latest September 30 verification: 348 backend tests, 18 worker tests, and 35 frontend tests passed; production build passed. Backend test fixtures isolate provider configuration from the local live-AI `.env`. Worker dependency deprecations and the existing large 3D bundle warning remain.
+- To test saved photos without creating or modifying a reconstruction/plan/quote, use `.\.venv\Scripts\python.exe scripts/probe-saved-furniture.py <furniture-id>` from the repository root with the API on 8011 and worker on 8010. The probe reuses saved dimensions, checks photo checksums and unchanged saved plans, and explicitly does not verify physical accuracy.
 
 - Canonical axes are X = left/right, Y = vertical, and Z = front/back; the floor is Y = 0.
 - Overall dimensions use width = X, height = Y, and depth = Z.

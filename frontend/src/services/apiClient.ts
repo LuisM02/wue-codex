@@ -1,6 +1,6 @@
 import type {
   BomHardwareCost, BomMaterialCost, CompleteCost, CostSelection, Furniture, FurnitureClassification,
-  FurnitureDimensions, FurnitureReconstruction, FurnitureImage, FurniturePlan, FurnitureType,
+  FurnitureDimensions, FurnitureReconstruction, FurnitureImage, FurnitureImageCalibrationPayload, FurniturePlan, FurnitureType,
   HardwareQuantity, ImageView, LaborQuantity,
   LaborRate, Material, MaterialQuantity, MaterialUnit, PlanComponent, PlanComponentPayload, PlanGeometry, Project, Quotation, UUID,
 } from "../types/api";
@@ -72,6 +72,8 @@ export const api = {
     },
     remove: (furnitureId: UUID, view: ImageView) =>
       request<void>(`/furniture/${furnitureId}/images/${view}`, { method: "DELETE" }),
+    calibrate: (furnitureId: UUID, view: ImageView, payload: FurnitureImageCalibrationPayload) =>
+      request<FurnitureImage>(`/furniture/${furnitureId}/images/${view}/calibration`, { method: "PUT", body: JSON.stringify(payload) }),
   },
   classification: {
     get: (furnitureId: UUID) => request<FurnitureClassification>(`/furniture/${furnitureId}/classification`),

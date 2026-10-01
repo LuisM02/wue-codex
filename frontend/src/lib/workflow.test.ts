@@ -22,6 +22,7 @@ describe("workflow access", () => {
       id: String(index), furniture_id: "f", view: view as "front", source: "upload" as const,
       original_filename: "x.jpg", content_type: "image/jpeg", file_size_bytes: 1,
       checksum_sha256: "x", pixel_width: 1, pixel_height: 1, created_at: "", updated_at: "",
+      object_left_ratio: "0", object_top_ratio: "0", object_width_ratio: "1", object_height_ratio: "1", is_mirrored: false,
     }));
 
     expect(canOpenStep("dimensions", context({ project, furniture: unclassified, images }))).toBe(false);
@@ -35,6 +36,7 @@ describe("workflow access", () => {
       id: String(index), furniture_id: "f", view: view as "front", source: "upload" as const,
       original_filename: "x.jpg", content_type: "image/jpeg", file_size_bytes: 1,
       checksum_sha256: "x", pixel_width: 1, pixel_height: 1, created_at: "", updated_at: "",
+      object_left_ratio: "0", object_top_ratio: "0", object_width_ratio: "1", object_height_ratio: "1", is_mirrored: false,
     }));
     expect(canOpenStep("dimensions", { ...base, images })).toBe(true);
   });
