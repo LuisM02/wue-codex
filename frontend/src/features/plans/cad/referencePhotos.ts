@@ -15,7 +15,10 @@ export interface ReferenceOption {
 }
 
 const VIEW_CANDIDATES: Record<OrthographicView, ImageView[]> = {
-  front: ["front", "back"],
+  front: ["front"],
+  back: ["back"],
+  left: ["left"],
+  right: ["right"],
   side: ["left", "right"],
   top: ["top"],
 };
@@ -37,6 +40,9 @@ export function initialReferenceByView(
 ): Record<OrthographicView, ImageView | null> {
   return {
     front: referenceOptionsForView("front", images)[0]?.value ?? null,
+    back: referenceOptionsForView("back", images)[0]?.value ?? null,
+    left: referenceOptionsForView("left", images)[0]?.value ?? null,
+    right: referenceOptionsForView("right", images)[0]?.value ?? null,
     side: referenceOptionsForView("side", images)[0]?.value ?? null,
     top: referenceOptionsForView("top", images)[0]?.value ?? null,
   };

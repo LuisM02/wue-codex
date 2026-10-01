@@ -271,7 +271,7 @@ export function PlanEditor({ furniture, dimensions, plan, referenceImages, onIma
           ? plan.status === "finalized"
             ? "This legacy revision was created before photo-derived reconstruction. It is read-only and is not a copy of the photographed design."
             : "This legacy revision was created before photo-derived reconstruction. It remains editable, but it is not a copy of the photographed design."
-          : `WUE uses canonical X/Y/Z component geometry. Edit the reconstructed ${plan ? furnitureLabel(plan.furniture_type).toLowerCase() : "furniture"} in Front, Side, and Top views, then finish the revision to lock it for 3D and costing.`}
+          : `WUE uses canonical X/Y/Z component geometry. Edit the reconstructed ${plan ? furnitureLabel(plan.furniture_type).toLowerCase() : "furniture"} in Front, Back, Left, Right, and Top views, then finish the revision to lock it for 3D and costing.`}
       </p>
       {error && <Notice tone="danger">{error}</Notice>}
       {analysis && <ReconstructionFeedback analysis={analysis} dimensions={dimensions} plan={plan} />}

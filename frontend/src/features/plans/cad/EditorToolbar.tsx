@@ -1,4 +1,4 @@
-import type { OrthographicView } from "./editorGeometry";
+import { EDITOR_VIEWS, type OrthographicView } from "./editorGeometry";
 
 interface Props {
   view: OrthographicView;
@@ -62,12 +62,12 @@ export function EditorToolbar(props: Props) {
       <div className="cad-toolbar__group">
         <ToolButton label="Select" icon="⌖" title="Select and move components" active toggle onClick={() => undefined} />
       </div>
-      <div className="cad-toolbar__group" aria-label="Orthographic view">
-        {(["front", "side", "top"] as const).map((view) => (
+      <div className="cad-toolbar__group cad-toolbar__group--views" aria-label="Orthographic view">
+        {EDITOR_VIEWS.map((view) => (
           <ToolButton
             key={view}
             label={view[0].toUpperCase() + view.slice(1)}
-            icon={view === "front" ? "▣" : view === "side" ? "▥" : "▤"}
+            icon={view === "front" || view === "back" ? "▣" : view === "left" || view === "right" ? "▥" : "▤"}
             title={`Show ${view} orthographic view`}
             active={props.view === view}
             toggle

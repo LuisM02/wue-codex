@@ -1,5 +1,5 @@
 import type { FurnitureType, PlanComponent } from "../../../types/api";
-import type { OrthographicView } from "./editorGeometry";
+import { EDITOR_VIEWS, type OrthographicView } from "./editorGeometry";
 import { adjacentPartId, comparisonPhoto, partReviewChecks } from "./partReview";
 import type { ReferenceImages } from "./referencePhotos";
 
@@ -21,7 +21,7 @@ export function PartReviewGuide({ furnitureType, components, selectedId, referen
   const selected = components[index];
   const previous = adjacentPartId(components, selectedId, -1);
   const next = adjacentPartId(components, selectedId, 1);
-  const views: OrthographicView[] = ["front", "side", "top"];
+  const views = EDITOR_VIEWS;
   return (
     <section className="cad-review-guide" aria-label="Part-by-part inspection guide">
       <div className="cad-review-guide__heading">
@@ -41,7 +41,7 @@ export function PartReviewGuide({ furnitureType, components, selectedId, referen
           <div className="cad-review-guide__actions" role="group" aria-label="Compare selected part with photos">
             {views.map((view) => (
               <button key={view} type="button" disabled={busy || !comparisonPhoto(view, selected, referenceImages)} onClick={() => onCompare(view)}>
-                Compare {view === "side" ? "Left/Right" : view === "top" ? "Top" : "Front/Back"} photo
+                Compare {view[0].toUpperCase() + view.slice(1)} photo
               </button>
             ))}
           </div>

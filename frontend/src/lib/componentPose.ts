@@ -1,6 +1,7 @@
 import type { PlanComponent } from "../types/api";
 
-export type ProjectionView = "front" | "side" | "top";
+// "side" is retained as the historical right-side projection for callers.
+export type ProjectionView = "front" | "back" | "left" | "right" | "side" | "top";
 export type Point3 = { x: number; y: number; z: number };
 export type Point2 = { horizontal: number; vertical: number };
 type PoseComponent = Pick<PlanComponent,
@@ -54,7 +55,9 @@ export function componentVertices(component: PoseComponent, boundingBox = false)
 }
 
 export function projectPoint(point: Point3, view: ProjectionView): Point2 {
-  return { horizontal: view === "side" ? point.z : point.x,
+  const side = view === "side" || view === "left" || view === "right";
+  const sign = view === "back" || view === "left" ? -1 : 1;
+  return { horizontal: sign * (side ? point.z : point.x),
     vertical: view === "top" ? point.z : point.y };
 }
 
@@ -89,7 +92,8 @@ export function componentDrawing(component: PoseComponent, view: ProjectionView)
   const visibleFaces: Point2[][] = [];
   for (const face of faces) {
     const normal = rotatePoint(face.normal, rotation(component));
-    const facing = view === "front" ? -normal.z : view === "side" ? normal.x : normal.y;
+    const facing = view === "front" ? -normal.z : view === "back" ? normal.z
+      : view === "left" ? -normal.x : view === "right" || view === "side" ? normal.x : normal.y;
     const visible = facing > 0.00000001;
     if (visible) visibleFaces.push(face.indices.map((index) => vertices[index]));
     face.indices.forEach((first, index) => {

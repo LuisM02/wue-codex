@@ -64,7 +64,8 @@ export function Furniture2DEditor({
   const warnings = semanticWarnings(plan.furniture_type, components);
   const selected = components.find((component) => component.id === selectedId) ?? null;
   const referenceOptions = referenceOptionsForView(view, referenceImages);
-  const referenceView = referenceByView[view];
+  const referenceView = referenceOptions.some((option) => option.value === referenceByView[view])
+    ? referenceByView[view] : referenceOptions[0]?.value ?? null;
   const referenceImage = referenceView ? referenceImages[referenceView] : undefined;
 
   function refreshHistoryState() {

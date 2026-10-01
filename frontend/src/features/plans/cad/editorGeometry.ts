@@ -1,7 +1,8 @@
 import type { FurnitureType, PlanComponent, PlanStatus } from "../../../types/api";
-import { hasComponentRotation, projectedBox } from "../../../lib/componentPose";
+import { hasComponentRotation, projectedBox, type ProjectionView } from "../../../lib/componentPose";
 
-export type OrthographicView = "front" | "side" | "top";
+export type OrthographicView = ProjectionView;
+export const EDITOR_VIEWS = ["front", "back", "left", "right", "top"] as const;
 export type ResizeHandle = "north-west" | "north-east" | "south-west" | "south-east";
 export type AxisGuide = { axis: "horizontal" | "vertical"; value: number };
 
@@ -10,8 +11,9 @@ export interface ProjectionDefinition {
   verticalPosition: "y" | "z";
   horizontalSize: "width" | "depth";
   verticalSize: "height" | "depth";
-  horizontalLabel: "X" | "Z";
+  horizontalLabel: "X" | "Z" | "−X" | "−Z";
   verticalLabel: "Y" | "Z";
+  horizontalSign: 1 | -1;
 }
 
 export interface ProjectedComponent {
@@ -36,6 +38,22 @@ export const VIEW_DEFINITIONS: Record<OrthographicView, ProjectionDefinition> = 
     verticalSize: "height",
     horizontalLabel: "X",
     verticalLabel: "Y",
+    horizontalSign: 1,
+  },
+  back: {
+    horizontalPosition: "x", verticalPosition: "y",
+    horizontalSize: "width", verticalSize: "height",
+    horizontalLabel: "−X", verticalLabel: "Y", horizontalSign: -1,
+  },
+  left: {
+    horizontalPosition: "z", verticalPosition: "y",
+    horizontalSize: "depth", verticalSize: "height",
+    horizontalLabel: "−Z", verticalLabel: "Y", horizontalSign: -1,
+  },
+  right: {
+    horizontalPosition: "z", verticalPosition: "y",
+    horizontalSize: "depth", verticalSize: "height",
+    horizontalLabel: "Z", verticalLabel: "Y", horizontalSign: 1,
   },
   side: {
     horizontalPosition: "z",
@@ -44,6 +62,7 @@ export const VIEW_DEFINITIONS: Record<OrthographicView, ProjectionDefinition> = 
     verticalSize: "height",
     horizontalLabel: "Z",
     verticalLabel: "Y",
+    horizontalSign: 1,
   },
   top: {
     horizontalPosition: "x",
@@ -52,6 +71,7 @@ export const VIEW_DEFINITIONS: Record<OrthographicView, ProjectionDefinition> = 
     verticalSize: "depth",
     horizontalLabel: "X",
     verticalLabel: "Z",
+    horizontalSign: 1,
   },
 };
 
@@ -148,7 +168,9 @@ export function projectComponent(
   const horizontalSize = sizeField(component, definition.horizontalSize);
   const verticalSize = sizeField(component, definition.verticalSize);
   return {
-    horizontal: numeric(component[definition.horizontalPosition]),
+    horizontal: definition.horizontalSign === 1
+      ? numeric(component[definition.horizontalPosition])
+      : -numeric(component[definition.horizontalPosition]) - numeric(component[horizontalSize]),
     vertical: numeric(component[definition.verticalPosition]),
     width: numeric(component[horizontalSize]),
     height: numeric(component[verticalSize]),
@@ -198,7 +220,7 @@ export function moveComponent(
 ): PlanComponent {
   const definition = VIEW_DEFINITIONS[view];
   const delta = screenDeltaToWorld(deltaX, deltaY, scale);
-  const horizontal = numeric(component[definition.horizontalPosition]) + delta.horizontal;
+  const horizontal = numeric(component[definition.horizontalPosition]) + definition.horizontalSign * delta.horizontal;
   const vertical = numeric(component[definition.verticalPosition]) + delta.vertical;
   return {
     ...component,
@@ -262,7 +284,7 @@ export function applyProjectedPosition(
   const projected = projectComponent(component, view);
   return {
     ...component,
-    [definition.horizontalPosition]: decimal(numeric(component[definition.horizontalPosition]) + horizontal - projected.horizontal),
+    [definition.horizontalPosition]: decimal(numeric(component[definition.horizontalPosition]) + definition.horizontalSign * (horizontal - projected.horizontal)),
     [definition.verticalPosition]: decimal(numeric(component[definition.verticalPosition]) + vertical - projected.vertical),
   };
 }
@@ -305,7 +327,7 @@ export function resizeComponent(
 
   const next: PlanComponent = {
     ...component,
-    [definition.horizontalPosition]: decimal(horizontal),
+    [definition.horizontalPosition]: decimal(definition.horizontalSign === 1 ? horizontal : -horizontal - width),
     [definition.verticalPosition]: decimal(vertical),
     [horizontalSize]: positiveDecimal(width),
     [verticalSize]: positiveDecimal(height),
@@ -328,6 +350,7 @@ export function moveProfilePoint(
   deltaY: number,
   scale: number,
   gridSpacing: number | null,
+  horizontalSign: 1 | -1 = 1,
 ): PlanComponent {
   if (hasComponentRotation(component)) return component;
   if (component.geometry_kind !== "extruded_profile" || !component.profile_points?.[pointIndex]) {
@@ -337,7 +360,7 @@ export function moveProfilePoint(
   const original = component.profile_points[pointIndex];
   const width = numeric(component.width);
   const height = numeric(component.height);
-  let u = numeric(original.u) + delta.horizontal;
+  let u = numeric(original.u) + horizontalSign * delta.horizontal;
   let v = numeric(original.v) + delta.vertical;
   if (gridSpacing) {
     u = snapToGrid(u, gridSpacing);

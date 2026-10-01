@@ -137,8 +137,10 @@ export function CanvasWorkspace({
   const [selectedProfilePoint, setSelectedProfilePoint] = useState<number | null>(null);
   const [calibrationOpen, setCalibrationOpen] = useState(false);
   const [calibrationDraft, setCalibrationDraft] = useState<CalibrationMargins | null>(null);
+  const definition = VIEW_DEFINITIONS[view];
+  const outlineView = view === "front" || view === "back";
   const overallHorizontal = dimensions
-    ? Number(view === "side" ? dimensions.depth_mm : dimensions.width_mm)
+    ? Number(definition.horizontalPosition === "z" ? dimensions.depth_mm : dimensions.width_mm)
     : null;
   const overallVertical = dimensions
     ? Number(view === "top" ? dimensions.depth_mm : dimensions.height_mm)
@@ -147,10 +149,11 @@ export function CanvasWorkspace({
     const componentBounds = projectionBounds(components, view);
     return {
       ...componentBounds,
-      maxHorizontal: Math.max(componentBounds.maxHorizontal, overallHorizontal ?? 0),
+      minHorizontal: Math.min(componentBounds.minHorizontal, definition.horizontalSign === -1 ? -(overallHorizontal ?? 0) : 0),
+      maxHorizontal: Math.max(componentBounds.maxHorizontal, definition.horizontalSign === 1 ? overallHorizontal ?? 0 : 0),
       maxVertical: Math.max(componentBounds.maxVertical, overallVertical ?? 0),
     };
-  }, [components, overallHorizontal, overallVertical, view]);
+  }, [components, definition.horizontalSign, overallHorizontal, overallVertical, view]);
   const spanHorizontal = Math.max(1, bounds.maxHorizontal - bounds.minHorizontal);
   const spanVertical = Math.max(1, bounds.maxVertical - bounds.minVertical);
   const fitScale = Math.min(
@@ -162,7 +165,6 @@ export function CanvasWorkspace({
   const originY = (CANVAS_HEIGHT - spanVertical * scale) / 2 + bounds.maxVertical * scale + pan.y;
   const toScreenHorizontal = (value: number) => originX + value * scale;
   const toScreenVertical = (value: number) => originY - value * scale;
-  const definition = VIEW_DEFINITIONS[view];
   const selected = components.find((component) => component.id === selectedId) ?? null;
   const selectedProjection = selected ? projectComponent(selected, view) : null;
   const selectedPoseEditable = !selected || !hasComponentRotation(selected);
@@ -173,7 +175,8 @@ export function CanvasWorkspace({
   const activeCalibration = calibrationOpen && draftCalibration ? draftCalibration : storedCalibration;
   const targetWidth = (overallHorizontal ?? spanHorizontal) * scale;
   const targetHeight = (overallVertical ?? spanVertical) * scale;
-  const targetLeft = toScreenHorizontal(0);
+  const targetLeft = toScreenHorizontal(definition.horizontalSign === -1
+    ? -(overallHorizontal ?? spanHorizontal) : 0);
   const targetTop = toScreenVertical(overallVertical ?? bounds.maxVertical);
   const photoWidth = activeCalibration ? targetWidth / Number(activeCalibration.object_width_ratio) : CANVAS_WIDTH;
   const photoHeight = activeCalibration ? targetHeight / Number(activeCalibration.object_height_ratio) : CANVAS_HEIGHT;
@@ -279,6 +282,7 @@ export function CanvasWorkspace({
           deltaY,
           scale,
           snapEnabled ? OUTLINE_SNAP_MM : null,
+          definition.horizontalSign,
         ),
       );
       return;
@@ -319,7 +323,7 @@ export function CanvasWorkspace({
   }
 
   function addOutlinePoint() {
-    if (locked || !selectedPoseEditable || view !== "front" || !selected?.profile_points) return;
+    if (locked || !selectedPoseEditable || !outlineView || !selected?.profile_points) return;
     const edgeIndex = selectedProfilePoint ?? longestProfileEdgeIndex(selected.profile_points);
     const after = insertProfilePoint(selected, edgeIndex);
     if (sameGeometry(selected, after)) return;
@@ -329,7 +333,7 @@ export function CanvasWorkspace({
   }
 
   function removeOutlinePoint(pointIndex = selectedProfilePoint) {
-    if (locked || !selectedPoseEditable || view !== "front" || !selected || pointIndex === null) return;
+    if (locked || !selectedPoseEditable || !outlineView || !selected || pointIndex === null) return;
     const after = removeProfilePoint(selected, pointIndex);
     if (sameGeometry(selected, after)) return;
     onPreview(after);
@@ -340,7 +344,13 @@ export function CanvasWorkspace({
   const ordered = [...components].sort((first, second) => {
     if (first.id === selectedId) return 1;
     if (second.id === selectedId) return -1;
-    return first.sort_order - second.sort_order;
+    // Paint distant parts first for the selected camera direction. Selection
+    // remains on top so a selected, otherwise occluded part can be inspected.
+    const depthAxis = view === "front" || view === "back" ? "z"
+      : view === "top" ? "y" : "x";
+    const farFirst = view === "front" || view === "left" ? -1 : 1;
+    return farFirst * (Number(first[depthAxis]) - Number(second[depthAxis]))
+      || first.sort_order - second.sort_order;
   });
 
   return (
@@ -457,8 +467,8 @@ export function CanvasWorkspace({
             const rotated = hasComponentRotation(component);
             const drawing = rotated ? componentDrawing(component, view) : null;
             const selectedShape = component.id === selectedId;
-            const polygon = view === "front" && component.geometry_kind === "extruded_profile" && component.profile_points
-              ? component.profile_points.map((point) => `${left + Number(point.u) * scale},${toScreenVertical(projected.vertical + Number(point.v))}`).join(" ")
+            const polygon = outlineView && component.geometry_kind === "extruded_profile" && component.profile_points
+              ? component.profile_points.map((point) => `${toScreenHorizontal(definition.horizontalSign * (Number(component.x) + Number(point.u)))},${toScreenVertical(Number(component.y) + Number(point.v))}`).join(" ")
               : null;
             return (
               <g
@@ -512,10 +522,10 @@ export function CanvasWorkspace({
                     onPointerDown={(event) => beginResize(event, selected, handle)}
                   />
                 ))}
-                {!locked && selectedPoseEditable && view === "front" && selected.profile_points?.map((point, pointIndex) => (
+                {!locked && selectedPoseEditable && outlineView && selected.profile_points?.map((point, pointIndex) => (
                   <circle
                     key={`profile-point-${pointIndex}`}
-                    cx={toScreenHorizontal(selectedProjection.horizontal + Number(point.u))}
+                    cx={toScreenHorizontal(definition.horizontalSign * (Number(selected.x) + Number(point.u)))}
                     cy={toScreenVertical(selectedProjection.vertical + Number(point.v))}
                     r="6"
                     className={`cad-profile-handle${selectedProfilePoint === pointIndex ? " is-active" : ""}`}
@@ -562,10 +572,10 @@ export function CanvasWorkspace({
           ? selectedPoseEditable ? "Read-only inspection" : "Read-only · projected bounds · local dimensions in Properties"
           : !selectedPoseEditable
             ? "Rotated part · drag to move · edit size/angles in Properties · shown dimensions are projected bounds"
-          : view === "front" && selected?.profile_points
+          : outlineView && selected?.profile_points
             ? "Drag round points to reshape the traced outline · square handles resize the whole part"
             : "Drag parts · drag corner handles to resize · Alt-drag or middle-drag to pan"}</span>
-        {view === "front" && selectedPoseEditable && selected?.profile_points && !locked ? (
+        {outlineView && selectedPoseEditable && selected?.profile_points && !locked ? (
           <div className="cad-outline-actions" role="toolbar" aria-label="Traced outline points">
             <span>{selected.profile_points.length} points</span>
             <button type="button" onClick={addOutlinePoint} disabled={selected.profile_points.length >= 256}>＋ Add point</button>
@@ -573,7 +583,7 @@ export function CanvasWorkspace({
           </div>
         ) : <span>{definition.horizontalLabel} horizontal · {definition.verticalLabel} vertical</span>}
         <span>Grid {visibleGridSpacing} mm · {snapEnabled
-          ? view === "front" && selectedPoseEditable && selected?.profile_points
+          ? outlineView && selectedPoseEditable && selected?.profile_points
             ? `Outline snap ${OUTLINE_SNAP_MM} mm`
             : `Snap ${GRID_SPACING_MM} mm`
           : "Snap off"}</span>

@@ -33,8 +33,11 @@ describe("Part-by-part inspection helpers", () => {
     expect(adjacentPartId(components, null, -1)).toBeNull();
     expect(adjacentPartId([], null, 1)).toBeNull();
   });
-  it("prefers a recorded source when its comparison photo exists", () => {
-    expect(comparisonPhoto("front", { ...shelf, source_views: ["back"] }, photos)).toBe("back");
+  it("matches the named view without treating comparison as recorded provenance", () => {
+    expect(comparisonPhoto("front", { ...shelf, source_views: ["back"] }, photos)).toBe("front");
+    expect(comparisonPhoto("back", shelf, photos)).toBe("back");
+    expect(comparisonPhoto("left", shelf, photos)).toBeNull();
+    expect(comparisonPhoto("right", shelf, photos)).toBe("right");
     expect(comparisonPhoto("side", shelf, photos)).toBe("right");
     expect(shelf.source_views).toEqual(["front"]);
   });
