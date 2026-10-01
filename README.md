@@ -3,6 +3,14 @@
 Latest verified prototype checkpoint and remaining limits:
 [October 1, 2026 checkpoint](docs/PROTOTYPE_CHECKPOINT_2026-10-01.md).
 
+Latest CAD review follow-on: photo-derived drawings have Previous/Next part
+navigation, available Front/Back–Left/Right–Top photo comparison buttons, and
+a display-only selected-part isolation toggle. Plain-language part checks and
+model-size/confidence reminders support review without recording it for the
+user. **85 frontend tests pass; production build passes.** Live bookshelf
+inspection left every saved plan field and its null review timestamp unchanged.
+This improves review usability, not automatic reconstruction accuracy.
+
 Latest bookshelf terminal-face follow-on: the bottom panel now uses its own
 coherent edge pair when visible, instead of always copying an interior shelf's
 thickness. Missing cap/bottom boundaries are explicitly labeled provisional.

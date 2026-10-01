@@ -160,7 +160,7 @@ export function PropertiesPanel({ component, locked, busy, onCommit }: Props) {
           <div className="cad-source-data">
             <strong>Photo source</strong>
             <span>{component.source_views.join(" · ")}</span>
-            {component.source_confidence && <small>{Math.round(Number(component.source_confidence) * 100)}% source confidence</small>}
+            {component.source_confidence !== null && <small>{Math.round(Number(component.source_confidence) * 100)}% proposal confidence · not reconstruction accuracy</small>}
           </div>
         )}
       </div>

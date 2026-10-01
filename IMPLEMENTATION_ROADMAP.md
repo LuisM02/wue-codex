@@ -1,6 +1,20 @@
 # WUE implementation roadmap
 
-October 1 terminal-face follow-on (newest): backed-bookshelf bottom thickness
+October 1 CAD review follow-on (newest): photo-derived plans now have an
+inspection guide with bounded Previous/Next selection, supplied-photo view
+shortcuts, selected-part isolation and plain-language bookshelf checks. Isolation
+retains full-furniture bounds, photo alignment and hidden component data; it is
+display-only. Source metadata stays separate from comparison photos. Model size
+is not called a measurement, confidence is not called accuracy, and navigation
+does not record review. Locked drawings retain inspection without geometry edits.
+Fresh frontend85/build-pass; backend377/worker46 remain preceding unchanged-code
+results, not rerun here. Live guide/navigation/three photo-view/isolation checks
+passed; all saved bookshelf plan fields remained byte-identical after testing.
+No API, schema, worker geometry, training, dependencies or automatic review added.
+Next: user review of the nine-part bookshelf, then confirmation/finalization by
+the user for deterministic 3D/BOM. Physical accuracy evaluation remains pending.
+
+October 1 terminal-face follow-on (preceding): backed-bookshelf bottom thickness
 prefers its own coherent front-face edge pair below the detected interior
 shelves. Missing lower/cap boundaries and missing terminal onset receive
 specific provisional warnings; the fallback is not presented as measured.

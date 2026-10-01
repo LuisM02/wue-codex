@@ -7,6 +7,8 @@ import { EditorToolbar } from "./EditorToolbar";
 import { EditorHistory } from "./editorHistory";
 import { canMutatePlan, semanticWarnings, type OrthographicView } from "./editorGeometry";
 import { PropertiesPanel } from "./PropertiesPanel";
+import { PartReviewGuide } from "./PartReviewGuide";
+import { comparisonPhoto } from "./partReview";
 import {
   initialReferenceByView,
   referenceOptionsForView,
@@ -52,6 +54,7 @@ export function Furniture2DEditor({
   const [gridVisible, setGridVisible] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [photoVisible, setPhotoVisible] = useState(reviewMode);
+  const [focusSelected, setFocusSelected] = useState(false);
   const [referenceByView, setReferenceByView] = useState(() => initialReferenceByView(referenceImages));
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -70,6 +73,7 @@ export function Furniture2DEditor({
 
   useEffect(() => {
     setSelectedId(components[0]?.id ?? null);
+    setFocusSelected(false);
     history.current.clear();
     refreshHistoryState();
   }, [plan.id, plan.status]);
@@ -88,6 +92,15 @@ export function Furniture2DEditor({
 
   function setReferenceView(next: ImageView) {
     setReferenceByView((current) => ({ ...current, [view]: next }));
+    setPhotoVisible(true);
+  }
+
+  function compareSelected(next: OrthographicView) {
+    if (!selected || busy) return;
+    const photo = comparisonPhoto(next, selected, referenceImages);
+    if (!photo) return;
+    setOrthographicView(next);
+    setReferenceByView((current) => ({ ...current, [next]: photo }));
     setPhotoVisible(true);
   }
 
@@ -199,6 +212,20 @@ export function Furniture2DEditor({
         onFit={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
         onFinish={reviewMode ? onReview : onFinish}
       />
+      {plan.source_reconstruction_id && (
+        <PartReviewGuide
+          furnitureType={plan.furniture_type}
+          components={components}
+          selectedId={selectedId}
+          referenceImages={referenceImages}
+          locked={locked}
+          busy={Boolean(busy)}
+          focusSelected={focusSelected}
+          onSelect={setSelectedId}
+          onCompare={compareSelected}
+          onFocus={() => setFocusSelected((value) => !value)}
+        />
+      )}
       <div className="cad-editor-grid">
         <ComponentPanel
           furnitureType={plan.furniture_type}
@@ -223,6 +250,7 @@ export function Furniture2DEditor({
           referenceView={referenceView}
           referenceOptions={referenceOptions}
           photoVisible={photoVisible}
+          focusSelected={focusSelected}
           zoom={zoom}
           pan={pan}
           onPan={setPan}

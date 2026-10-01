@@ -1,5 +1,50 @@
 # WUE prototype checkpoint — October 1, 2026
 
+## Latest CAD part-by-part inspection checkpoint
+
+- IMPLEMENTED: photo-derived drawings show a part-by-part guide. Previous/Next
+  follows the current component list without wrapping; no selection can restart
+  at the first part. Buttons select available comparison photos in Front/Back,
+  Left/Right and Top groups, prefer recorded source views and reset fit/pan.
+  A comparison photo is not added to the saved AI source metadata.
+- IMPLEMENTED: Show only this part hides other SVG shapes but keeps all model
+  components, full-furniture scale, photo alignment and snapping context.
+  Selection/property/outline editing continues under the existing draft rules.
+  Isolation resets on plan/status change and falls back to all shapes when
+  nothing is selected. Finalized drawings remain read-only.
+- Plain-language bookshelf checks distinguish shelves, terminal panels, sides
+  and backing; renamed/other furniture parts get generic identity/shape/depth
+  checks. Current local sizes are model values, not verified measurements.
+  The inspector labels proposal confidence as not reconstruction accuracy,
+  including zero-confidence values. Neither navigation nor isolation records
+  review, and no new completion/accuracy percentage is presented.
+- New files: `frontend/src/features/plans/cad/partReview.ts`,
+  `PartReviewGuide.tsx`, `partReview.test.ts` in the same directory. Modified:
+  `Furniture2DEditor.tsx`, `CanvasWorkspace.tsx`, `PropertiesPanel.tsx` in that
+  directory, plus `frontend/src/styles.css` and checkpoint docs.
+- Fresh verification: **85 frontend tests passed across12 files**, production
+  build passed. Existing lazy viewer chunk warning remains852.86kB. One initial
+  isolation test compared the first rendered shape (an unselected bottom) to
+  the selected shelf; its selector was corrected, then the final suite passed.
+  Backend377 and worker46 are previous unchanged-code results, not rerun here.
+- Live browser checks on the nine-part bookshelf draft: next/previous selection,
+  last-part navigation boundary, source-preferred front photo and side/top photo
+  switching, isolation and shelf-specific notes passed. DOM shape count was1
+  while isolated; all nine saved components remain. Read-only before/after API
+  JSON comparison confirmed every saved plan field identical, including
+  `status = draft`, `parts_reviewed_at = null`. No geometry, alignment,
+  classification, analysis, confirmation or finalization was saved by testing.
+- Screenshot is local, outside Git:
+  `C:\Users\Luis Mendoza\Documents\ChatGPT\wue codex edition\wue-part-review-guide.jpg`.
+  The app is left on shelf1, Front photo, isolation enabled and guide notes open.
+  The user can toggle isolation off; it is not a deleted-parts view.
+
+This is a review-usability improvement, not new inference, physical accuracy,
+training or camera calibration. Existing review/finalization gates, APIs,
+database schema and dependencies are unchanged. Next: user compares the draft
+with photos, corrects provisional size/depth/shape, then confirms and finalizes
+only when satisfied. Do not do those approval actions on their behalf.
+
 ## Latest bookshelf terminal-face checkpoint
 
 - IMPLEMENTED: the backed-bookshelf bottom panel prefers an independently

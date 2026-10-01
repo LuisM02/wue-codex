@@ -40,6 +40,7 @@ interface Props {
   referenceView: ImageView | null;
   referenceOptions: ReferenceOption[];
   photoVisible: boolean;
+  focusSelected?: boolean;
   zoom: number;
   pan: { x: number; y: number };
   onPan: (pan: { x: number; y: number }) => void;
@@ -120,6 +121,7 @@ export function CanvasWorkspace({
   referenceView,
   referenceOptions,
   photoVisible,
+  focusSelected = false,
   zoom,
   pan,
   onPan,
@@ -444,7 +446,7 @@ export function CanvasWorkspace({
           ) : (
             <line key={`${guide.axis}-${index}`} className="cad-snap-guide" x1="0" x2={CANVAS_WIDTH} y1={toScreenVertical(guide.value)} y2={toScreenVertical(guide.value)} />
           ))}
-          {ordered.map((component) => {
+          {ordered.filter((component) => !focusSelected || !selected || component.id === selectedId).map((component) => {
             const projected = projectComponent(component, view);
             const left = toScreenHorizontal(projected.horizontal);
             const top = toScreenVertical(projected.vertical + projected.height);
@@ -555,6 +557,7 @@ export function CanvasWorkspace({
         </svg>
       </div>
       <footer className="cad-statusbar">
+        {focusSelected && selected && <span>Only selected part shown · other parts are retained</span>}
         <span>{locked
           ? selectedPoseEditable ? "Read-only inspection" : "Read-only · projected bounds · local dimensions in Properties"
           : !selectedPoseEditable
