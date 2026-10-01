@@ -91,6 +91,54 @@ def test_shadow_pair_does_not_duplicate_a_shelf_face():
     assert len(_bookshelf_edge_bands(view, _coherent_photo_edges(view))) == 4
 
 
+def _terminal_view(thickness):
+    image = Image.open(BytesIO(_backed_photo())).convert("RGB")
+    draw = ImageDraw.Draw(image)
+    # A distinct terminal face near the feet, not another interior shelf.
+    draw.rectangle((44, 245, 196, 245 + thickness - 1), fill="#f2d1a5")
+    draw.rectangle((44, 245 + thickness, 196, 260), fill="#c4a278")
+    data = BytesIO()
+    image.save(data, "PNG")
+    return analyze_image("front", data.getvalue())
+
+
+def test_terminal_face_uses_its_own_thickness_not_median_interior_shelf():
+    parts, warnings = _parts(_terminal_view(8))
+    assert len([name for name in parts if name.startswith("shelf_")]) == 4
+    assert parts["bottom_panel"].height > parts["shelf_1"].height * 1.4
+    assert parts["bottom_panel"].width == parts["shelf_1"].width
+    assert any("its own visible front-face edge pair" in warning for warning in warnings)
+    assert not any("lower face boundary was not separated" in warning for warning in warnings)
+
+
+def test_changed_terminal_thickness_does_not_change_shelves_or_back_top():
+    thin, _ = _parts(_terminal_view(4))
+    thick, _ = _parts(_terminal_view(8))
+    assert thick["bottom_panel"].height == pytest.approx(thin["bottom_panel"].height * 2, abs=.001)
+    assert (thick["bottom_panel"].y + thick["bottom_panel"].height) == pytest.approx(
+        thin["bottom_panel"].y + thin["bottom_panel"].height, abs=.001,
+    )
+    assert thick["back_panel"] == thin["back_panel"]
+    assert all(thick[f"shelf_{number}"] == thin[f"shelf_{number}"] for number in range(1, 5))
+
+
+def test_missing_terminal_edge_explicitly_labels_copied_thickness():
+    parts, warnings = _parts(_backed_view())
+    assert parts["bottom_panel"].height == parts["shelf_1"].height
+    assert any("lower face boundary was not separated" in warning for warning in warnings)
+    assert any("median visible interior shelf-face thickness was reused" in warning for warning in warnings)
+
+
+def test_terminal_pair_range_does_not_change_interior_detection():
+    view = _terminal_view(8)
+    edges = _coherent_photo_edges(view)
+    interiors = _bookshelf_edge_bands(view, edges)
+    terminals = _bookshelf_edge_bands(view, edges, low=.93, high=.99)
+    assert len(interiors) == 4
+    assert len(terminals) == 1
+    assert terminals[0][1] - terminals[0][0] == 8
+
+
 @pytest.mark.parametrize("positions,expected_status", [((65, 108, 151, 194), 200), ((), 422)])
 def test_worker_http_reports_detected_shelves_or_explicit_failure(positions, expected_status):
     views = ("front", "back", "left", "right", "top")

@@ -1029,6 +1029,7 @@ def _coherent_photo_edges(
 
 def _bookshelf_edge_bands(
     front: AnalyzedView, edges: list[tuple[int, float]],
+    *, low: float = 0.07, high: float = 0.93,
 ) -> list[tuple[int, int]]:
     """Pair sustained opposite edges of thin shelf faces; suppress shadow pairs."""
     maximum = max(3, round(front.object_height * 0.04))
@@ -1037,8 +1038,8 @@ def _bookshelf_edge_bands(
         for first, second in zip(edges, edges[1:])
         if first[1] * second[1] < 0
         and 2 <= second[0] - first[0] <= maximum
-        and first[0] > front.object_height * 0.07
-        and second[0] < front.object_height * 0.93
+        and first[0] > front.object_height * low
+        and second[0] < front.object_height * high
     ]
     bands: list[tuple[int, int]] = []
     for _, start, stop in sorted(candidates, reverse=True):
@@ -1098,6 +1099,20 @@ def _backed_bookshelf(
                     < front.object_height * 0.95]
     bottom_start = max(bottom_edges) if bottom_edges else front.object_height - face_height
     bottom_stop = min(front.object_height, bottom_start + face_height)
+    # Prefer an independently observed terminal face over copying the median
+    # interior shelf thickness. The pair must lie below all interior shelves,
+    # have the same onset polarity, and retain foreground on both boundaries;
+    # floor/background transitions are deliberately not treated as timber.
+    terminal_bands = _bookshelf_edge_bands(
+        front, edges,
+        low=(shelves[-1][1] / front.object_height + 0.05), high=0.99,
+    )
+    terminal_bands = [band for band in terminal_bands
+                      if any(position == band[0] and contrast * polarity > 0
+                             for position, contrast in edges)]
+    measured_bottom = next((band for band in terminal_bands if band[0] == bottom_start), None)
+    if measured_bottom is not None:
+        bottom_start, bottom_stop = measured_bottom
 
     def region(x_start: int, y_start: int, x_stop: int, y_stop: int) -> TracedRegion:
         return _rectangle_region(
@@ -1124,11 +1139,33 @@ def _backed_bookshelf(
             f"shelf_{number}", "panel", region(interior_left, start, interior_right, stop),
             depth * 0.94, 0, 4 + number, 0.5, ["front"],
         ))
-    return parts, [
+    warnings = [
         "Shelf faces were proposed from long internal contrast edges, not the outer silhouette; review each boundary",
-        "Bookshelf panel depth, back thickness, hidden joints and terminal panel thickness remain provisional; side/back views have not independently fitted them",
+        "Bookshelf panel depth, back thickness and hidden joints remain provisional; side/back views have not independently fitted them",
         "Perspective and floor shadows can distort the frame scale; confirm dimensions before finalizing",
     ]
+    if measured_bottom is None:
+        warnings.append(
+            "Bottom-panel thickness is provisional: its lower face boundary was not separated; "
+            "the median visible interior shelf-face thickness was reused"
+        )
+    else:
+        warnings.append(
+            "Bottom-panel thickness uses its own visible front-face edge pair, not an interior shelf; "
+            "it is a projected estimate, not a physical measurement"
+        )
+    if not cap_edges:
+        warnings.append(
+            "Top-panel thickness is provisional: no reliable cap boundary was found; "
+            "the median visible interior shelf-face thickness was reused"
+        )
+    else:
+        warnings.append(
+            "Top-panel thickness uses the front cap boundary; perspective can exaggerate its physical thickness"
+        )
+    if not bottom_edges:
+        warnings.append("Bottom-panel position is provisional: no reliable terminal face onset was found")
+    return parts, warnings
 
 
 def _bookshelf(

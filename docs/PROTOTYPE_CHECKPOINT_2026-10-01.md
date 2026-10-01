@@ -1,5 +1,46 @@
 # WUE prototype checkpoint — October 1, 2026
 
+## Latest bookshelf terminal-face checkpoint
+
+- IMPLEMENTED: the backed-bookshelf bottom panel prefers an independently
+  observed coherent opposite-edge pair below the interior shelves, with the
+  same onset polarity. It no longer always copies the interior shelf median
+  when its own face is distinguishable. Foreground coverage, contrast,
+  thin-face bounds and shadow suppression remain required; detection thresholds
+  were not weakened. Interior shelf detection remains unchanged.
+- Explicit warnings identify copied bottom thickness, missing top-cap boundary
+  and missing bottom onset. A visible face remains a projected estimate, not
+  a measured physical thickness. Side/back depth, back thickness and joinery
+  are still provisional.
+- Changed implementation: `reconstruction-worker/wue_worker/geometry.py`;
+  changed tests: `reconstruction-worker/tests/test_bookshelf_geometry.py`.
+  Four added controlled tests verify independent terminal thickness, unchanged
+  interior/back geometry, explicit fallback and terminal/interior separation.
+- Fresh worker result: **46 passed**, two existing Starlette/AnyIO deprecation
+  warnings. Backend377/frontend65/build-pass are the previous checkpoint's
+  results; those unchanged modules were not rerun here. Whitespace check passed.
+- Only the verified worker on8010 was reloaded. The first launcher check caught
+  its transient shutdown listener and safely refused to start; a retry after
+  confirmed exit succeeded. API/frontend stayed healthy; database/proxy/SAM GPU
+  readiness passed. No installations, migrations or resets occurred.
+- Live read-only SAM probes: bookshelf remains four interior shelves/nine parts;
+  top/bottom remain14.4mm because their independent boundaries are ambiguous.
+  New fallback warnings explain this, rather than claiming better accuracy on
+  these inputs. Table remains nine parts. Both probes verified saved plans
+  unchanged and report `accuracy_verified = false`.
+- Existing stored reconstruction notes were not replaced by these probes.
+  Updated notes apply to future analysis; do not silently rerun saved finalized
+  furniture just to refresh them. The nine-part bookshelf comparison remains
+  draft with null review timestamp. Six-part bookshelf, nine-part table and
+  fourteen-/eighteen-part finalized chair plans are preserved. Readback also
+  includes finalized chair plan `69c6ef6d-fd24-445a-a408-fe87684acf92`, eighteen
+  parts, user-reviewed at `2026-10-01T13:05:17.273019+08:00`; it was not changed.
+
+Next: user reviews the comparison draft against the photographs and supplies
+physical size/stock thickness when possible. Do not finalize on the user's
+behalf, claim exact reconstruction or interpret controlled fixtures as an
+accuracy benchmark. No new schema, API payload, dependency or training added.
+
 ## Latest photo-analysis failure feedback
 
 The local worker was already returning bounded text details, but its photo
@@ -95,7 +136,7 @@ measured reconstruction accuracy or production readiness.
   edition/package branding. Existing local directories and database identifiers
   are retained for compatibility; branding changes do not rename or migrate them.
 
-## Fresh verification
+## Fresh verification (earlier full checkpoint; see latest results above)
 
 - Backend: **348 passed**, including real PostgreSQL tests using a uniquely
   named disposable sibling database. Application/demo records are not test targets.
@@ -124,8 +165,9 @@ virtual environments, and local runtime logs are excluded from the source push.
 - Earlier fourteen-part chair plan `13fd5bce-0a74-445a-a176-58afee54fda5`
   was finalized during user testing. Preserve it rather than rebuilding it.
 - Current eighteen-part chair plan `3fe6f55a-d667-4f94-95ea-f20c56193bc1`
-  is a draft with `parts_reviewed_at = null`. Approximate overall size:
-  450 × 900 × 500 mm. Do not confirm or finalize on the user's behalf.
+  is now finalized, user-reviewed at `2026-10-01T13:07:14.169833+08:00`.
+  Approximate overall size: 450 × 900 × 500 mm. Earlier draft descriptions
+  are historical; the agent did not confirm or finalize on the user's behalf.
 - The temporary 8-degree UI rotation test was undone; it is not a measured
   or fitted chair angle. No automatic photo-fitted lean is included here.
 

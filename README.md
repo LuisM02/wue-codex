@@ -3,13 +3,20 @@
 Latest verified prototype checkpoint and remaining limits:
 [October 1, 2026 checkpoint](docs/PROTOTYPE_CHECKPOINT_2026-10-01.md).
 
+Latest bookshelf terminal-face follow-on: the bottom panel now uses its own
+coherent edge pair when visible, instead of always copying an interior shelf's
+thickness. Missing cap/bottom boundaries are explicitly labeled provisional.
+**46 worker tests pass**. A read-only SAM probe still finds nine parts in the
+saved bookshelf; its ambiguous terminal estimates remain unchanged. This does
+not establish physical accuracy or alter any saved draft/finalized drawing.
+
 Latest failure-feedback follow-on: explicit worker photo rejections now return
 HTTP422 through the business API, distinct from unavailable services (503) and
 invalid worker responses (502). Recognition/reconstruction screens retain the
 specific reason with correction or service-readiness guidance. Manual type
 selection is explicitly not AI recognition and does not restore reconstruction.
 **377 backend tests and 65 frontend tests pass; production build passes.**
-Latest unchanged worker result remains42 passed, not rerun for this follow-on.
+Worker42 was the unchanged preceding result at that failure-feedback checkpoint.
 Failed analysis tests verify saved recognition, analysis and geometry are retained.
 
 October 1 bookshelf follow-on: solid-backed bookshelves now use sustained

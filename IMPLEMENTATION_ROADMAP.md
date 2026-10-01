@@ -1,6 +1,20 @@
 # WUE implementation roadmap
 
-October 1 failure-feedback follow-on (newest): worker input rejection now maps
+October 1 terminal-face follow-on (newest): backed-bookshelf bottom thickness
+prefers its own coherent front-face edge pair below the detected interior
+shelves. Missing lower/cap boundaries and missing terminal onset receive
+specific provisional warnings; the fallback is not presented as measured.
+Worker46 tests pass (two existing deprecation warnings). The live SAM bookshelf
+probe remains nine parts with unchanged ambiguous terminal estimates; table
+probe remains nine parts. Both probes verify saved plans unchanged. Backend377,
+frontend65 and build-pass are preceding unchanged-module results, not rerun here.
+Worker safely reloaded; readiness passed. No dependencies, schema, endpoints,
+training, automatic finalization or cross-view depth fitting were added.
+The nine-part bookshelf comparison remains an unreviewed draft. Next: review
+its part boundaries and obtain real overall/stock dimensions; avoid treating
+the reused 450 × 900 × 500mm scale as accuracy evidence.
+
+October 1 failure-feedback follow-on (preceding): worker input rejection now maps
 to API422 through separate domain exceptions, not an invalid-output502. Worker
 configuration/busy/unavailable faults remain503; malformed results/errors remain
 502. Transport timeouts have explicit bounded reasons. UI retains the worker
