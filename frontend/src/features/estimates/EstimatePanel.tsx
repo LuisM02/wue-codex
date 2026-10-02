@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 
 import { BusyLabel, Notice, SectionHeading } from "../../components/Feedback";
 import { isDemoCatalogName, isWoodScrewMaterial } from "../../lib/catalog";
-import { formatDate, formatNumber, unitLabel } from "../../lib/format";
+import { formatNumber, unitLabel } from "../../lib/format";
+import { QuoteLimitations } from "./QuoteLimitations";
+import { QuotationCard } from "./QuotationCard";
 import { api } from "../../services/apiClient";
 import type {
   BomSelection,
@@ -133,7 +135,7 @@ export function EstimatePanel({ furniture, plan, initialSelection }: Props) {
 
   return (
     <section className="workspace-section workspace-section--wide estimate-workspace">
-      <SectionHeading eyebrow="Step 07 · Transparent costing" title="Build the final estimate">
+      <SectionHeading eyebrow="Step 07 · Transparent costing" title="Build the prototype estimate">
         <span className="status-badge status-badge--finalized">Plan revision {plan.revision}</span>
       </SectionHeading>
       <p className="section-intro">
@@ -141,6 +143,7 @@ export function EstimatePanel({ furniture, plan, initialSelection }: Props) {
       </p>
       {error && <Notice tone="danger">{error}</Notice>}
       {usesDemoPrices && <Notice tone="warning">Demonstration estimate using sample catalog prices. Replace them with supplier and workshop prices before quoting real work.</Notice>}
+      <QuoteLimitations furnitureType={plan.furniture_type} />
       {!catalogReady && busy !== "load" && (
         <Notice tone="warning">
           The pricing catalog needs at least one active wood material, an active hardware item named “Wood screw,” and one labor rate—with dated prices—before a complete estimate can be calculated.
@@ -213,7 +216,7 @@ export function EstimatePanel({ furniture, plan, initialSelection }: Props) {
             </div>
           ) : (
             <>
-              <header><div><small>Complete cost</small><strong>{formatNumber(estimate.total_cost)}</strong></div><span>Exact total</span></header>
+              <header><div><small>Calculated subtotal</small><strong>{formatNumber(estimate.total_cost)}</strong></div><span>Prototype estimate</span></header>
               <div className="cost-lines">
                 <article>
                   <div><span className="cost-dot cost-dot--wood" /><div><strong>{estimate.material.material_name}</strong><small>{formatNumber(estimate.material.total_quantity_in_price_unit)} {unitLabel(estimate.material.price_unit)} × {formatNumber(estimate.material.price_per_unit)}</small></div></div>
@@ -249,19 +252,7 @@ export function EstimatePanel({ furniture, plan, initialSelection }: Props) {
         ) : (
           <div className="quotation-list">
             {quotations.map((quote) => (
-              <article key={quote.id} className="quotation-card">
-                <header>
-                  <div><small>Quotation</small><strong>{quote.quotation_number}</strong></div>
-                  <div className="quotation-card__total"><small>Total cost</small><strong>{formatNumber(quote.total_cost)}</strong></div>
-                </header>
-                <p>{furniture.name} · Revision {quote.plan_revision} · created {formatDate(quote.created_at)}</p>
-                <dl>
-                  <div><dt>{quote.wood_material_name}</dt><dd>{formatNumber(quote.wood_material_cost)}</dd></div>
-                  <div><dt>{quote.hardware_material_name}</dt><dd>{formatNumber(quote.hardware_cost)}</dd></div>
-                  <div><dt>{quote.labor_rate_name}</dt><dd>{formatNumber(quote.labor_cost)}</dd></div>
-                </dl>
-                <footer>{isDemoCatalogName(quote.wood_material_name) || isDemoCatalogName(quote.labor_rate_name) ? "Demonstration prices · " : ""}Price snapshot locked at creation</footer>
-              </article>
+              <QuotationCard key={quote.id} quote={quote} furnitureName={furniture.name} />
             ))}
           </div>
         )}

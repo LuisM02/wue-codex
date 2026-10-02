@@ -1,5 +1,22 @@
 # WUE Furniture Workshop
 
+Latest quotation disclosure revision (October 2, 2026): working and saved
+estimates now show a dedicated prototype-scope note. Each saved quote also
+displays its own snapshot quantities, units and rates, rather than live catalog
+values. The UI says **Calculated subtotal / Prototype estimate**, not **Exact
+total / final estimate**. Saved-card limitations remain in print styling, with
+single-column layout and readable assumption text; actual printer/PDF output
+was not generated during verification. Warnings disclose wood-only costing,
+net volume without waste/layout, assumed hardware/labor, omitted table apron
+work, excluded tax/markup/overhead/currency and unverified dimensions/safety.
+No calculator, snapshot, API, database or approval behavior changed.
+**123 frontend tests across 15 files pass; TypeScript/production build passes**
+with the unchanged 852.86kB viewer-chunk warning. Live browser rendering and
+loaded print CSS passed; the saved sample quote remains **5,831.51**. The
+read-only checker passes and the unreviewed draft is still blocked. Full
+backend/worker suites were not rerun for this frontend-only change (preceding
+results381/66). See [quotation disclosure checkpoint](docs/QUOTE_DISCLOSURE_CHECKPOINT_2026-10-02.md).
+
 Latest defense-chain verification (October 2, 2026): the preserved finalized
 table's nine 3D parts match its exact 2D source IDs, sizes, positions, rotations,
 profiles and quantities. Polygon-area material volumes and the saved quotation
