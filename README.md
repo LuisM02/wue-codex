@@ -1,5 +1,22 @@
 # WUE Furniture Workshop
 
+Latest defense-chain verification (October 2, 2026): the preserved finalized
+table's nine 3D parts match its exact 2D source IDs, sizes, positions, rotations,
+profiles and quantities. Polygon-area material volumes and the saved quotation
+arithmetic agree; the live sample estimate still displays **5,831.51**. The
+unreviewed audit draft remains blocked from 3D, material/hardware/labor quantity
+and complete-cost routes. New **read-only** `scripts/check-defense-demo.py`
+repeats these checks using only business API GETs, detects concurrent changes,
+and treats edited catalog prices separately from immutable historical quotes.
+**Backend381, frontend115 and checker17 tests pass; build passes** with
+the existing852.86kB viewer-chunk warning. Worker66 is the immediately preceding
+verified result, not rerun for this checker-only revision. Live browser checks
+rendered the preserved table in 3D, loaded its BOM, and calculated the sample
+quote without creating a quotation or finalizing/editing any plan. Hardware
+and labor omit separate apron work under the existing v1 assumptions; purchasing
+waste, physical accuracy and structural safety remain unverified. See the
+[defense workflow checkpoint](docs/DEFENSE_WORKFLOW_CHECKPOINT_2026-10-02.md).
+
 Latest table-mapping revision (October 2, 2026): the worker now locates the
 side elevation's own projected tabletop band instead of reusing the front
 photo's height fraction. Side leg sampling and apron mapping use that boundary;
